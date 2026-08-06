@@ -1,0 +1,29 @@
+# Run from the repository root:
+#   docker compose -f docker/docker-compose.yml up --build
+# Then browse to https://localhost:8443/simplesaml/ (self-signed cert warning is
+# expected -- the base image ships a development certificate).
+services:
+  ssp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        SSP_VERSION: "${SSP_VERSION:-v2.5.0}"
+        EMBEDDED_DISCO_VERSION: "${EMBEDDED_DISCO_VERSION:-@dev}"
+    hostname: ssp.local
+    ports:
+      - "8443:443"
+    environment:
+      # Re-registers the path repository on startup; the module itself is
+      # already required in composer.json from the build.
+      - STAGINGCOMPOSERREPOS=embeddeddisco
+      - SSP_ADMIN_PASSWORD=secret1
+      - SSP_ENABLED_MODULES=exampleauth embeddeddisco
+      - SSP_LOG_LEVEL=7
+      - SSP_SECRET_SALT=testsalt
+    volumes:
+      # Live-edit the module without rebuilding.
+      - ../:/var/simplesamlphp/staging-modules/embeddeddisco
+      - ./ssp/authsources.php:/var/simplesamlphp/config/authsources.php:ro
+      - ./ssp/config-override.php:/var/simplesamlphp/config/config-override.php:ro
+      - ../config-templates/module_embeddeddisco.php:/var/simplesamlphp/config/module_embeddeddisco.php:ro

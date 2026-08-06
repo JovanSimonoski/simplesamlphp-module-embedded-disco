@@ -1,0 +1,204 @@
+{% set pagetitle = 'Choose your provider'|trans %}
+{% extends "base.twig" %}
+
+{% block preload %}
+<style>
+  .eds { --eds-line: #dcdcdc; --eds-muted: #6b6b6b; --eds-accent: #2b5c8a; }
+
+  .eds-head { margin-bottom: 1rem; }
+  .eds-head h2 { margin-bottom: .25rem; }
+  .eds-lede { color: var(--eds-muted); font-size: .9rem; margin: 0; }
+
+  .eds-facts { display: flex; flex-wrap: wrap; gap: .35rem 1.25rem;
+    border: 1px solid var(--eds-line); border-radius: 6px;
+    padding: .6rem .75rem; margin: 0 0 1rem; font-size: .8rem; }
+  .eds-fact { display: flex; gap: .35rem; align-items: baseline; min-width: 0; }
+  .eds-fact dt { color: var(--eds-muted); margin: 0; }
+  .eds-fact dd { margin: 0; overflow-wrap: anywhere; }
+
+  .eds-toolbar { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end;
+    background: #f7f8fa; border: 1px solid var(--eds-line); border-radius: 6px;
+    padding: .75rem; margin-bottom: 1rem; }
+  .eds-field { display: flex; flex-direction: column; gap: .2rem; }
+  .eds-field label { font-size: .75rem; color: var(--eds-muted);
+    text-transform: uppercase; letter-spacing: .04em; }
+  .eds-field input, .eds-field select { margin: 0; }
+  .eds-field-grow { flex: 1 1 14rem; }
+  .eds-field-grow input { width: 100%; }
+
+  .eds-count { display: flex; justify-content: space-between; align-items: baseline;
+    flex-wrap: wrap; gap: .5rem; font-size: .8rem; color: var(--eds-muted);
+    margin-bottom: .5rem; }
+
+  .eds-list { list-style: none; margin: 0; padding: 0; }
+  .eds-item { display: grid; grid-template-columns: 2.5rem 1fr auto; gap: .75rem;
+    align-items: center; border: 1px solid var(--eds-line); border-radius: 6px;
+    padding: .75rem; margin-bottom: .5rem; }
+  .eds-item:hover { border-color: var(--eds-accent); background: #fafbfc; }
+  .eds-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%;
+    background: #e8eef5; color: var(--eds-accent); font-weight: 700;
+    display: flex; align-items: center; justify-content: center; }
+  .eds-body { min-width: 0; }
+  .eds-name { font-weight: 600; }
+  .eds-org { font-size: .8rem; color: var(--eds-muted); }
+  .eds-id { font-family: monospace; font-size: .72rem; color: #888;
+    overflow-wrap: anywhere; margin-top: .1rem; }
+  .eds-desc { font-size: .85rem; margin: .3rem 0 0; }
+  .eds-tags { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: .4rem; }
+  .eds-tag { font-size: .7rem; border-radius: 10px; padding: .1rem .5rem;
+    background: #eef0f3; color: #555; }
+  .eds-tag-mark { background: #e6f4ea; color: #1e6b34; }
+  .eds-actions { display: flex; flex-direction: column; gap: .3rem;
+    align-items: stretch; text-align: center; }
+  .eds-info { font-size: .72rem; }
+
+  .eds-pager { display: flex; gap: .75rem; align-items: center;
+    margin-top: 1rem; flex-wrap: wrap; }
+  .eds-foot { margin-top: 1.5rem; padding-top: .75rem;
+    border-top: 1px solid var(--eds-line); font-size: .78rem; color: var(--eds-muted); }
+  .eds-foot code { overflow-wrap: anywhere; }
+
+  @media (max-width: 40rem) {
+    .eds-item { grid-template-columns: 2.5rem 1fr; }
+    .eds-actions { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="eds">
+
+  <div class="eds-head">
+    <h2>{{ pagetitle }}</h2>
+    <p class="eds-lede">
+      {% trans %}Providers discovered beneath the Trust Anchor of this federation.{% endtrans %}
+    </p>
+  </div>
+
+  {% if usingMockData %}
+    <div class="message-box">
+      {% trans %}Mock federation data. No network discovery is performed.{% endtrans %}
+    </div>
+  {% endif %}
+
+  <dl class="eds-facts">
+    <div class="eds-fact">
+      <dt>{% trans %}Trust Anchor{% endtrans %}</dt>
+      <dd><code>{{ trustAnchorId }}</code></dd>
+    </div>
+    {% if lastUpdated %}
+      <div class="eds-fact">
+        <dt>{% trans %}Discovered{% endtrans %}</dt>
+        <dd>{{ lastUpdated|date('Y-m-d H:i') }}</dd>
+      </div>
+    {% endif %}
+    <div class="eds-fact">
+      <dt>{% trans %}Matching{% endtrans %}</dt>
+      <dd>{{ total }}</dd>
+    </div>
+  </dl>
+
+  <form method="get" action="{{ formUrl }}" class="eds-toolbar">
+    {% if returnTo %}<input type="hidden" name="ReturnTo" value="{{ returnTo }}">{% endif %}
+
+    <div class="eds-field eds-field-grow">
+      <label for="eds-query">{% trans %}Search{% endtrans %}</label>
+      <input type="search" id="eds-query" name="query" value="{{ query }}"
+             placeholder="{% trans %}name, organisation or entity ID{% endtrans %}" autofocus>
+    </div>
+
+    <div class="eds-field">
+      <label for="eds-entity-type">{% trans %}Entity type{% endtrans %}</label>
+      <select id="eds-entity-type" name="entity_type">
+        {% for availableEntityType in availableEntityTypes %}
+          <option value="{{ availableEntityType }}"
+            {%- if availableEntityType in entityTypes %} selected{% endif %}>
+            {{ availableEntityType }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="eds-field">
+      <label for="eds-sort-dir">{% trans %}Sort{% endtrans %}</label>
+      <select id="eds-sort-dir" name="sort_dir">
+        <option value="asc"{% if sortOrder == 'asc' %} selected{% endif %}>A &rarr; Z</option>
+        <option value="desc"{% if sortOrder == 'desc' %} selected{% endif %}>Z &rarr; A</option>
+      </select>
+    </div>
+
+    <div class="eds-field">
+      <button class="btn pure-button" type="submit">{% trans %}Apply{% endtrans %}</button>
+    </div>
+  </form>
+
+  {% if entities|length == 0 %}
+    <div class="message-box message-box-error">
+      {% trans %}No providers match these filters.{% endtrans %}
+      <a href="{{ resetUrl }}">{% trans %}Clear filters{% endtrans %}</a>
+    </div>
+  {% else %}
+    <div class="eds-count">
+      <span>{{ entities|length }} {% trans %}of{% endtrans %} {{ total }} {% trans %}shown{% endtrans %}</span>
+      {% if query or nextPageUrl %}
+        <a href="{{ resetUrl }}">{% trans %}Reset{% endtrans %}</a>
+      {% endif %}
+    </div>
+
+    <ul class="eds-list">
+      {% for entity in entities %}
+        <li class="eds-item">
+          <div class="eds-avatar" aria-hidden="true">{{ entity.displayName|slice(0, 1)|upper }}</div>
+
+          <div class="eds-body">
+            <div class="eds-name">{{ entity.displayName }}</div>
+            {% if entity.organizationName %}
+              <div class="eds-org">{{ entity.organizationName }}</div>
+            {% endif %}
+            <div class="eds-id">{{ entity.entityId }}</div>
+            {% if entity.description %}
+              <p class="eds-desc">{{ entity.description }}</p>
+            {% endif %}
+            <div class="eds-tags">
+              {% for entityType in entity.entityTypes %}
+                <span class="eds-tag">{{ entityType }}</span>
+              {% endfor %}
+              {% for trustMarkType in entity.trustMarkTypes %}
+                <span class="eds-tag eds-tag-mark" title="{{ trustMarkType }}">
+                  &#10003; {{ trustMarkType|split('/')|last }}
+                </span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="eds-actions">
+            <a class="btn pure-button"
+               href="{{ selectUrl }}?entity_id={{ entity.entityId|url_encode }}{% if returnTo %}&amp;ReturnTo={{ returnTo|url_encode }}{% endif %}">
+              {% trans %}Select{% endtrans %}
+            </a>
+            {% if entity.informationUri %}
+              <a class="eds-info" href="{{ entity.informationUri }}"
+                 target="_blank" rel="noopener noreferrer">{% trans %}More info{% endtrans %}</a>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+
+    <div class="eds-pager">
+      {% if nextPageUrl %}
+        <a class="btn pure-button" href="{{ nextPageUrl }}">{% trans %}Next page{% endtrans %} &rarr;</a>
+      {% else %}
+        <span class="eds-lede">{% trans %}End of results.{% endtrans %}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <p class="eds-foot">
+    {% trans %}The same result set is served as an OpenID Federation entity
+    collection response at{% endtrans %}
+    <a href="{{ entitiesUrl }}"><code>{{ entitiesUrl }}</code></a>
+  </p>
+
+</div>
+{% endblock %}

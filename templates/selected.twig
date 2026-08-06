@@ -1,0 +1,37 @@
+{% set pagetitle = 'Provider selected'|trans %}
+{% extends "base.twig" %}
+
+{% block preload %}
+<style>
+  .eds-picked { border: 1px solid #dcdcdc; border-radius: 6px;
+    padding: .75rem; margin-bottom: 1rem; }
+  .eds-picked dt { font-size: .75rem; color: #6b6b6b;
+    text-transform: uppercase; letter-spacing: .04em; margin: 0 0 .15rem; }
+  .eds-picked dd { margin: 0 0 .6rem; overflow-wrap: anywhere; }
+  .eds-picked dd:last-child { margin-bottom: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+  <h2>{{ pagetitle }}</h2>
+
+  <dl class="eds-picked">
+    <dt>{% trans %}Provider{% endtrans %}</dt>
+    <dd><code>{{ entityId }}</code></dd>
+    <dt>{% trans %}Trust Anchor{% endtrans %}</dt>
+    <dd><code>{{ trustAnchorId }}</code></dd>
+  </dl>
+
+  <div class="message-box">
+    {% trans %}This is where the relying party hand-off belongs. This
+    SimpleSAMLphp instance is not configured as an OpenID Connect relying party
+    yet, so no authentication request is started.{% endtrans %}
+  </div>
+
+  <p>
+    {% if returnTo %}
+      <a class="btn pure-button" href="{{ returnTo }}">{% trans %}Continue{% endtrans %}</a>
+    {% endif %}
+    <a href="{{ moduleURL('embeddeddisco/disco') }}">&larr; {% trans %}Back to discovery{% endtrans %}</a>
+  </p>
+{% endblock %}

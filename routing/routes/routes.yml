@@ -1,0 +1,29 @@
+---
+
+embeddeddisco-discovery:
+  path: /disco
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\Discovery::main'
+  }
+  methods: [GET]
+
+embeddeddisco-entities:
+  path: /entities
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\Discovery::entities'
+  }
+  methods: [GET]
+
+embeddeddisco-select:
+  path: /select
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\Discovery::select'
+  }
+  methods: [GET]
+
+embeddeddisco-status:
+  path: /status
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\Status::status'
+  }
+  methods: [GET]

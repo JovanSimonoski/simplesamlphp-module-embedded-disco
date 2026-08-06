@@ -1,0 +1,7 @@
+.git
+.github
+vendor
+composer.lock
+.phpunit.cache
+.phpunit.result.cache
+nbproject

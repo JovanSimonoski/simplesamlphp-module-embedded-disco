@@ -1,12 +1,12 @@
 {
-    "name": "simplesamlphp/simplesamlphp-module-oidanchor",
-    "description": "OpenID Anchor module",
+    "name": "simplesamlphp/simplesamlphp-module-embeddeddisco",
+    "description": "Embedded discovery for SimpleSAMLphp, driven by OpenID Federation",
     "type": "simplesamlphp-module",
-    "keywords": [ "oidc", "anchor" ],
+    "keywords": [ "oidc", "openid-federation", "discovery" ],
     "license": "LGPL-2.1-or-later",
     "autoload": {
         "psr-4": {
-            "SimpleSAML\\Module\\oidanchor\\": "src/"
+            "SimpleSAML\\Module\\embeddeddisco\\": "src/"
         }
     },
     "require": {
@@ -16,7 +16,8 @@
         "ext-openssl": "*",
         "ext-pdo": "*",
 
-        "simplesamlphp/assert": "^1.9",
+        "simplesamlphp/assert": "^2.0",
+        "simplesamlphp/openid": "^0.5",
         "simplesamlphp/simplesamlphp": "^2.5@dev"
     },
     "require-dev": {
@@ -30,5 +31,7 @@
             "phpstan/extension-installer": true,
             "simplesamlphp/composer-xmlprovider-installer": true
         }
-    }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }
