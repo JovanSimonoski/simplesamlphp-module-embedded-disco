@@ -7,13 +7,28 @@ use SimpleSAML\OpenID\Codebooks\EntityTypesEnum;
 
 $config = [
     // Trust Anchor the discovery starts from. Every entity offered to the user
-    // is a subordinate of this anchor.
+    // is a subordinate of this anchor. Its Entity Configuration lives at
+    // <trust_anchor_id>/.well-known/openid-federation, and that document is the
+    // entry point for everything the module does.
     //
-    // The default is the GEANT Trust and Identity Incubator's OpenID Federation
-    // testbed. Its Entity Configuration lives at
-    // <trust_anchor_id>/.well-known/openid-federation and names the demo OP and
-    // RP as subordinates.
-    ModuleConfig::OPTION_TRUST_ANCHOR_ID => 'https://oidfed-ta-demo.incubator.geant.org',
+    // This is one of the fed.oidfed.com demo topologies: a Trust Anchor with two
+    // intermediate authorities under it, and providers under those, so discovery
+    // has a real multi-level federation to traverse and a picked provider has a
+    // Trust Chain with an intermediate in it.
+    //
+    // The project's own target federation is the GEANT Trust and Identity
+    // Incubator testbed:
+    //
+    //   https://oidfed-ta-demo.incubator.geant.org
+    //
+    // As of 2026-08-19 that anchor cannot be traversed or resolved by any
+    // conforming client: its Entity Configuration is served from
+    // oidfed-ta-demo.incubator.geant.org but declares itself, and publishes all
+    // of its endpoints, as oidfed-ta.demo.incubator.geant.org, which does not
+    // resolve. Its own resolve endpoint answers "no valid trust path between sub
+    // and anchor found" for its own subordinate. Switch back to it once that is
+    // fixed; nothing else here has to change.
+    ModuleConfig::OPTION_TRUST_ANCHOR_ID => 'https://ta.hier.fed.oidfed.com',
 
     // Entity types offered in the picker. An RP discovering where to send the
     // user wants OPs, so that is the default.
