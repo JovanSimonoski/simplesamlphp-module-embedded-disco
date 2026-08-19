@@ -2,74 +2,36 @@
 {% extends "base.twig" %}
 
 {% block preload %}
-<style>
-  .eds { --eds-line: #dcdcdc; --eds-muted: #6b6b6b; --eds-accent: #2b5c8a; }
-
-  .eds-head { margin-bottom: 1rem; }
-  .eds-head h2 { margin-bottom: .25rem; }
-  .eds-lede { color: var(--eds-muted); font-size: .9rem; margin: 0; }
-
-  .eds-facts { display: flex; flex-wrap: wrap; gap: .35rem 1.25rem;
-    border: 1px solid var(--eds-line); border-radius: 6px;
-    padding: .6rem .75rem; margin: 0 0 1rem; font-size: .8rem; }
-  .eds-fact { display: flex; gap: .35rem; align-items: baseline; min-width: 0; }
-  .eds-fact dt { color: var(--eds-muted); margin: 0; }
-  .eds-fact dd { margin: 0; overflow-wrap: anywhere; }
-
-  .eds-toolbar { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end;
-    background: #f7f8fa; border: 1px solid var(--eds-line); border-radius: 6px;
-    padding: .75rem; margin-bottom: 1rem; }
-  .eds-field { display: flex; flex-direction: column; gap: .2rem; }
-  .eds-field label { font-size: .75rem; color: var(--eds-muted);
-    text-transform: uppercase; letter-spacing: .04em; }
-  .eds-field input, .eds-field select { margin: 0; }
-  .eds-field-grow { flex: 1 1 14rem; }
-  .eds-field-grow input { width: 100%; }
-
-  .eds-count { display: flex; justify-content: space-between; align-items: baseline;
-    flex-wrap: wrap; gap: .5rem; font-size: .8rem; color: var(--eds-muted);
-    margin-bottom: .5rem; }
-
-  .eds-list { list-style: none; margin: 0; padding: 0; }
-  .eds-item { display: grid; grid-template-columns: 2.5rem 1fr auto; gap: .75rem;
-    align-items: center; border: 1px solid var(--eds-line); border-radius: 6px;
-    padding: .75rem; margin-bottom: .5rem; }
-  .eds-item:hover { border-color: var(--eds-accent); background: #fafbfc; }
-  .eds-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%;
-    background: #e8eef5; color: var(--eds-accent); font-weight: 700;
-    display: flex; align-items: center; justify-content: center; }
-  .eds-logo { width: 2.5rem; height: 2.5rem; object-fit: contain; }
-  .eds-body { min-width: 0; }
-  .eds-name { font-weight: 600; }
-  .eds-org { font-size: .8rem; color: var(--eds-muted); }
-  .eds-id { font-family: monospace; font-size: .72rem; color: #888;
-    overflow-wrap: anywhere; margin-top: .1rem; }
-  .eds-desc { font-size: .85rem; margin: .3rem 0 0; }
-  .eds-tags { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: .4rem; }
-  .eds-tag { font-size: .7rem; border-radius: 10px; padding: .1rem .5rem;
-    background: #eef0f3; color: #555; }
-  .eds-tag-mark { background: #e6f4ea; color: #1e6b34; }
-  .eds-actions { display: flex; flex-direction: column; gap: .3rem;
-    align-items: stretch; text-align: center; }
-  .eds-info { font-size: .72rem; }
-
-  .eds-pager { display: flex; gap: .75rem; align-items: center;
-    margin-top: 1rem; flex-wrap: wrap; }
-  .eds-foot { margin-top: 1.5rem; padding-top: .75rem;
-    border-top: 1px solid var(--eds-line); font-size: .78rem; color: var(--eds-muted); }
-  .eds-foot code { overflow-wrap: anywhere; }
-  .eds-detail { display: block; margin-top: .4rem; font-family: monospace;
-    font-size: .72rem; overflow-wrap: anywhere; }
-
-  @media (max-width: 40rem) {
-    .eds-item { grid-template-columns: 2.5rem 1fr; }
-    .eds-actions { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; }
-  }
-</style>
+  {# A stylesheet, not an inline <style> block: SimpleSAMLphp sends
+     "Content-Security-Policy: ... style-src 'self'", under which an inline block
+     is dropped by the browser and the page renders unstyled. #}
+  <link rel="stylesheet" href="{{ asset('css/discovery.css', 'embeddeddisco') }}">
 {% endblock %}
 
 {% block content %}
 <div class="eds">
+
+  <svg class="eds-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <symbol id="eds-i-search" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>
+    </symbol>
+    <symbol id="eds-i-alert" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5h.01"/>
+    </symbol>
+    <symbol id="eds-i-info" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.5h.01"/>
+    </symbol>
+    <symbol id="eds-i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+    <symbol id="eds-i-refresh" viewBox="0 0 24 24">
+      <path d="M20 11a8 8 0 10-2.3 6.3"/><path d="M20 5v6h-6"/>
+    </symbol>
+    <symbol id="eds-i-empty" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/><path d="M8.5 11h5"/>
+    </symbol>
+    <symbol id="eds-i-arrow" viewBox="0 0 24 24">
+      <path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>
+    </symbol>
+  </svg>
 
   <div class="eds-head">
     <h2>{{ pagetitle }}</h2>
@@ -79,28 +41,34 @@
   </div>
 
   {% if usingMockData %}
-    <div class="message-box">
-      {% trans %}Fixture data. No federation is contacted, and selections are not verified.{% endtrans %}
+    <div class="eds-note eds-note-info">
+      <svg class="eds-icon"><use href="#eds-i-info"/></svg>
+      <p>{% trans %}Fixture data. No federation is contacted, and selections are not verified.{% endtrans %}</p>
     </div>
   {% endif %}
 
   {% if discoveryFailed %}
-    <div class="message-box message-box-error">
-      {% trans %}The federation could not be read, so no providers can be offered.
-      The Trust Anchor is unreachable or is not answering with a valid Entity
-      Configuration.{% endtrans %}
-      {% if discoveryError %}
-        <code class="eds-detail">{{ discoveryError }}</code>
-      {% endif %}
+    <div class="eds-note eds-note-danger">
+      <svg class="eds-icon"><use href="#eds-i-alert"/></svg>
+      <div>
+        <p class="eds-note-title">
+          {% trans %}The federation could not be read, so no providers can be offered.
+          The Trust Anchor is unreachable or is not answering with a valid Entity
+          Configuration.{% endtrans %}
+        </p>
+        {% if discoveryError %}
+          <code class="eds-detail">{{ discoveryError }}</code>
+        {% endif %}
+      </div>
     </div>
   {% endif %}
 
-  <dl class="eds-facts">
-    <div class="eds-fact">
+  <dl class="eds-meta">
+    <div>
       <dt>{% trans %}Trust Anchor{% endtrans %}</dt>
-      <dd><code>{{ trustAnchorId }}</code></dd>
+      <dd><code title="{{ trustAnchorId }}">{{ trustAnchorId }}</code></dd>
     </div>
-    <div class="eds-fact">
+    <div>
       <dt>{% trans %}Source{% endtrans %}</dt>
       <dd>
         {% if discoverySource == 'mock' %}
@@ -113,21 +81,26 @@
       </dd>
     </div>
     {% if lastUpdated %}
-      <div class="eds-fact">
+      <div>
         <dt>{% trans %}Discovered{% endtrans %}</dt>
         <dd>{{ lastUpdated|date('Y-m-d H:i') }}</dd>
       </div>
     {% endif %}
     {% if total is not null %}
-      <div class="eds-fact">
+      <div>
         <dt>{% trans %}Matching{% endtrans %}</dt>
         <dd>{{ total }}</dd>
       </div>
     {% endif %}
     {% if refreshUrl %}
-      <div class="eds-fact">
+      <div class="eds-meta-action">
         <dt>{% trans %}Cache{% endtrans %}</dt>
-        <dd><a href="{{ refreshUrl }}">{% trans %}Discover again{% endtrans %}</a></dd>
+        <dd>
+          <a href="{{ refreshUrl }}">
+            <svg class="eds-icon"><use href="#eds-i-refresh"/></svg>
+            {% trans %}Discover again{% endtrans %}
+          </a>
+        </dd>
       </div>
     {% endif %}
   </dl>
@@ -137,8 +110,11 @@
 
     <div class="eds-field eds-field-grow">
       <label for="eds-query">{% trans %}Search{% endtrans %}</label>
-      <input type="search" id="eds-query" name="query" value="{{ query }}"
-             placeholder="{% trans %}name, organisation or entity ID{% endtrans %}" autofocus>
+      <div class="eds-search">
+        <svg class="eds-icon"><use href="#eds-i-search"/></svg>
+        <input type="search" id="eds-query" name="query" value="{{ query }}"
+               placeholder="{% trans %}name, organisation or entity ID{% endtrans %}" autofocus>
+      </div>
     </div>
 
     <div class="eds-field">
@@ -162,24 +138,25 @@
     </div>
 
     <div class="eds-field">
-      <button class="btn pure-button" type="submit">{% trans %}Apply{% endtrans %}</button>
+      <button class="eds-btn eds-btn-primary" type="submit">{% trans %}Apply{% endtrans %}</button>
     </div>
   </form>
 
   {% if entities|length == 0 %}
     {% if not discoveryFailed %}
-      <div class="message-box message-box-error">
-        {% trans %}No providers match these filters.{% endtrans %}
-        <a href="{{ resetUrl }}">{% trans %}Clear filters{% endtrans %}</a>
+      <div class="eds-empty">
+        <svg class="eds-icon"><use href="#eds-i-empty"/></svg>
+        <p>{% trans %}No providers match these filters.{% endtrans %}</p>
+        <a class="eds-btn" href="{{ resetUrl }}">{% trans %}Clear filters{% endtrans %}</a>
       </div>
     {% endif %}
   {% else %}
     <div class="eds-count">
       <span>
         {%- if total is null -%}
-          {{ entities|length }} {% trans %}shown{% endtrans %}
+          <strong>{{ entities|length }}</strong> {% trans %}shown{% endtrans %}
         {%- else -%}
-          {{ entities|length }} {% trans %}of{% endtrans %} {{ total }} {% trans %}shown{% endtrans %}
+          <strong>{{ entities|length }}</strong> {% trans %}of{% endtrans %} {{ total }} {% trans %}shown{% endtrans %}
         {%- endif -%}
       </span>
       {% if query or nextPageUrl %}
@@ -190,20 +167,25 @@
     <ul class="eds-list">
       {% for entity in entities %}
         <li class="eds-item">
-          {% if entity.logoUri %}
-            {# Loaded straight from the provider, so the browser tells it a user is picking. #}
-            <img class="eds-logo" src="{{ entity.logoUri }}" alt=""
-                 loading="lazy" referrerpolicy="no-referrer">
-          {% else %}
-            <div class="eds-avatar" aria-hidden="true">{{ entity.displayName|slice(0, 1)|upper }}</div>
-          {% endif %}
+          <div class="eds-mark">
+            {# The initial sits underneath the logo, so an entity whose logo_uri
+               does not resolve falls back to it instead of an empty tile. #}
+            <span class="eds-avatar" aria-hidden="true">{{ entity.displayName|slice(0, 1)|upper }}</span>
+            {% if entity.logoUri %}
+              {# Loaded straight from the provider, so the browser tells it a user is picking.
+                 data-initial is what the stylesheet paints if the logo does not load. #}
+              <img class="eds-logo" src="{{ entity.logoUri }}" alt=""
+                   data-initial="{{ entity.displayName|slice(0, 1)|upper }}"
+                   loading="lazy" referrerpolicy="no-referrer">
+            {% endif %}
+          </div>
 
           <div class="eds-body">
             <div class="eds-name">{{ entity.displayName }}</div>
             {% if entity.organizationName %}
               <div class="eds-org">{{ entity.organizationName }}</div>
             {% endif %}
-            <div class="eds-id">{{ entity.entityId }}</div>
+            <div class="eds-id" title="{{ entity.entityId }}">{{ entity.entityId }}</div>
             {% if entity.description %}
               <p class="eds-desc">{{ entity.description }}</p>
             {% endif %}
@@ -216,6 +198,7 @@
                    resolution, which happens once the provider is picked. #}
                 <span class="eds-tag eds-tag-mark"
                       title="{% trans %}Claimed Trust Mark, validated on selection{% endtrans %}: {{ trustMarkType }}">
+                  <svg class="eds-icon"><use href="#eds-i-check"/></svg>
                   {{ trustMarkType|split('/')|last }}
                 </span>
               {% endfor %}
@@ -223,7 +206,7 @@
           </div>
 
           <div class="eds-actions">
-            <a class="btn pure-button"
+            <a class="eds-btn eds-btn-primary"
                href="{{ selectUrl }}?entity_id={{ entity.entityId|url_encode }}{% if returnTo %}&amp;ReturnTo={{ returnTo|url_encode }}{% endif %}">
               {% trans %}Select{% endtrans %}
             </a>
@@ -238,9 +221,12 @@
 
     <div class="eds-pager">
       {% if nextPageUrl %}
-        <a class="btn pure-button" href="{{ nextPageUrl }}">{% trans %}Next page{% endtrans %} &rarr;</a>
+        <a class="eds-btn" href="{{ nextPageUrl }}">
+          {% trans %}Next page{% endtrans %}
+          <svg class="eds-icon"><use href="#eds-i-arrow"/></svg>
+        </a>
       {% else %}
-        <span class="eds-lede">{% trans %}End of results.{% endtrans %}</span>
+        <span>{% trans %}End of results.{% endtrans %}</span>
       {% endif %}
     </div>
   {% endif %}

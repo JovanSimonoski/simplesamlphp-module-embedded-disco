@@ -1,0 +1,477 @@
+/*
+ * Embedded discovery picker.
+ *
+ * Served as a module asset rather than inlined in the template: SimpleSAMLphp
+ * sends "Content-Security-Policy: ... style-src 'self'", which blocks inline
+ * <style> blocks and style attributes outright. A stylesheet from the module's
+ * own origin is what that policy allows.
+ *
+ * Everything is scoped under .eds. The surrounding theme styles bare elements --
+ * including a link hover that inverts to white on dark and adds padding, which
+ * makes a page of links and buttons jump on hover -- so the picker opts out of
+ * that rather than inheriting it.
+ */
+
+.eds {
+  --eds-ink: #1a1f2b;
+  --eds-muted: #5f6879;
+  --eds-faint: #8b94a3;
+  --eds-line: #e3e7ee;
+  --eds-line-strong: #ccd3e0;
+  --eds-surface: #ffffff;
+  --eds-soft: #f7f8fb;
+  --eds-accent: #1b3a6b;
+  --eds-accent-hover: #14294c;
+  --eds-accent-soft: #eaf0fa;
+  --eds-success: #17643c;
+  --eds-success-soft: #e7f5ed;
+  --eds-success-line: #c6e6d4;
+  --eds-danger: #a52318;
+  --eds-danger-soft: #fdeceb;
+  --eds-danger-line: #f4cdc9;
+  --eds-amber: #7a5300;
+  --eds-amber-soft: #fff5e2;
+  --eds-amber-line: #f0e0bd;
+  --eds-radius: 10px;
+  --eds-shadow: 0 1px 2px rgba(16, 24, 40, .06);
+  --eds-shadow-lift: 0 8px 20px -8px rgba(16, 24, 40, .25);
+
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--eds-ink);
+  line-height: 1.5;
+}
+
+.eds *,
+.eds *::before,
+.eds *::after { box-sizing: border-box; }
+
+.eds-sprite { display: none; }
+
+.eds svg.eds-icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The theme's inverted link hover, undone; each link restyles its own. */
+.eds a { color: var(--eds-accent); text-decoration: none; }
+.eds a:hover,
+.eds a:focus {
+  background-color: transparent;
+  color: var(--eds-accent-hover);
+  padding: 0;
+  text-decoration: underline;
+}
+.eds a:focus-visible,
+.eds button:focus-visible,
+.eds input:focus-visible,
+.eds select:focus-visible {
+  outline: 2px solid var(--eds-accent);
+  outline-offset: 2px;
+}
+
+/* Page header ------------------------------------------------------------- */
+
+.eds-head { margin-bottom: 1.15rem; }
+.eds-head h2 {
+  margin: 0 0 .3rem;
+  padding: 0;
+  border: 0;
+  font-size: 1.6rem;
+  font-weight: 650;
+  letter-spacing: -.01em;
+  color: var(--eds-ink);
+}
+.eds-lede { margin: 0; padding: 0; color: var(--eds-muted); font-size: .925rem; }
+
+/* Notices ----------------------------------------------------------------- */
+
+.eds-note {
+  display: flex;
+  gap: .65rem;
+  align-items: flex-start;
+  border: 1px solid var(--eds-line);
+  border-left-width: 4px;
+  border-radius: var(--eds-radius);
+  background: var(--eds-soft);
+  padding: .85rem 1rem;
+  margin: 0 0 1rem;
+  font-size: .9rem;
+}
+.eds-note svg.eds-icon { width: 1.15rem; height: 1.15rem; margin-top: .12rem; }
+.eds-note p { margin: 0; padding: 0; }
+.eds-note a { color: inherit; text-decoration: underline; }
+.eds-note-info {
+  border-color: var(--eds-amber-line);
+  border-left-color: var(--eds-amber);
+  background: var(--eds-amber-soft);
+  color: var(--eds-amber);
+}
+.eds-note-danger {
+  border-color: var(--eds-danger-line);
+  border-left-color: var(--eds-danger);
+  background: var(--eds-danger-soft);
+  color: var(--eds-danger);
+}
+.eds-note-title { font-weight: 600; }
+
+.eds-detail {
+  display: block;
+  margin-top: .45rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .72rem;
+  line-height: 1.5;
+  opacity: .9;
+  overflow-wrap: anywhere;
+}
+
+/* Federation status strip -------------------------------------------------- */
+
+.eds-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem .45rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  font-size: .78rem;
+}
+.eds-meta > div {
+  display: flex;
+  align-items: baseline;
+  gap: .4rem;
+  min-width: 0;
+  background: var(--eds-soft);
+  border: 1px solid var(--eds-line);
+  border-radius: 999px;
+  padding: .3rem .75rem;
+}
+.eds-meta dt {
+  margin: 0;
+  color: var(--eds-faint);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: .68rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.eds-meta dd { margin: 0; min-width: 0; color: var(--eds-ink); font-weight: 550; }
+.eds-meta code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .74rem;
+  display: block;
+  max-width: 24rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.eds-meta-action { background: var(--eds-accent-soft); border-color: #cfdcf1; }
+.eds-meta-action a { display: inline-flex; align-items: center; gap: .3rem; font-weight: 600; }
+.eds-meta-action a:hover, .eds-meta-action a:focus { text-decoration: underline; }
+
+/* Toolbar ------------------------------------------------------------------ */
+
+.eds-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+  align-items: flex-end;
+  background: var(--eds-surface);
+  border: 1px solid var(--eds-line);
+  border-radius: var(--eds-radius);
+  box-shadow: var(--eds-shadow);
+  padding: .9rem;
+  margin: 0 0 1.1rem;
+}
+.eds-field { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+.eds-field label {
+  font-size: .7rem;
+  font-weight: 600;
+  color: var(--eds-faint);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.eds-field-grow { flex: 1 1 15rem; }
+
+.eds-search { position: relative; display: flex; align-items: center; }
+.eds-search svg.eds-icon {
+  position: absolute;
+  left: .75rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--eds-faint);
+  pointer-events: none;
+}
+
+.eds input[type="search"],
+.eds select {
+  margin: 0;
+  width: 100%;
+  font: inherit;
+  font-size: .9rem;
+  color: var(--eds-ink);
+  background-color: var(--eds-surface);
+  border: 1px solid var(--eds-line-strong);
+  border-radius: 8px;
+  padding: .5rem .7rem;
+  height: 2.45rem;
+}
+.eds input[type="search"] { padding-left: 2.2rem; }
+.eds input[type="search"]:hover,
+.eds select:hover { border-color: #b3bdd0; }
+.eds input[type="search"]::placeholder { color: var(--eds-faint); }
+.eds select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.1rem;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f6879' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .6rem center;
+  background-size: 1rem;
+}
+
+/* Buttons ------------------------------------------------------------------ */
+
+.eds-btn,
+.eds a.eds-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  font: inherit;
+  font-size: .875rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: .65rem 1.05rem;
+  height: 2.45rem;
+  border-radius: 8px;
+  border: 1px solid var(--eds-line-strong);
+  background: var(--eds-surface);
+  color: var(--eds-ink);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+}
+.eds-btn:hover, .eds a.eds-btn:hover,
+.eds-btn:focus, .eds a.eds-btn:focus {
+  background: var(--eds-soft);
+  border-color: #b3bdd0;
+  color: var(--eds-ink);
+  padding: .65rem 1.05rem;
+  text-decoration: none;
+}
+.eds-btn-primary, .eds a.eds-btn-primary {
+  background: var(--eds-accent);
+  border-color: var(--eds-accent);
+  color: #fff;
+}
+.eds-btn-primary:hover, .eds a.eds-btn-primary:hover,
+.eds-btn-primary:focus, .eds a.eds-btn-primary:focus {
+  background: var(--eds-accent-hover);
+  border-color: var(--eds-accent-hover);
+  color: #fff;
+}
+
+/* Result count ------------------------------------------------------------- */
+
+.eds-count {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin: 0 0 .6rem;
+  font-size: .82rem;
+  color: var(--eds-muted);
+}
+.eds-count strong { color: var(--eds-ink); font-weight: 650; }
+
+/* Provider list ------------------------------------------------------------ */
+
+.eds-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+
+.eds-item {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+  gap: .35rem 1rem;
+  /* Top aligned, so the tile sits beside the name rather than drifting down
+     the card as description and badges make the row taller. */
+  align-items: start;
+  background: var(--eds-surface);
+  border: 1px solid var(--eds-line);
+  border-radius: var(--eds-radius);
+  box-shadow: var(--eds-shadow);
+  padding: .95rem 1rem;
+  transition: border-color .12s ease, box-shadow .12s ease, transform .12s ease;
+}
+.eds-item:hover {
+  border-color: var(--eds-line-strong);
+  box-shadow: var(--eds-shadow-lift);
+  transform: translateY(-1px);
+}
+.eds-item:focus-within { border-color: var(--eds-accent); box-shadow: var(--eds-shadow-lift); }
+
+.eds-mark {
+  position: relative;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid var(--eds-line);
+  background: var(--eds-soft);
+}
+.eds-avatar {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--eds-accent);
+  background: var(--eds-accent-soft);
+}
+/* Opaque, so a logo that does load covers the initial underneath it. */
+.eds-logo {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #fff;
+}
+/* A logo hosted by the provider is on another origin, which SimpleSAMLphp's
+   content security policy (img-src 'self' data:) blocks. Generated content is
+   rendered only for an image that failed, so this paints the initial back over
+   the broken-image placeholder, and never over a logo that did load. */
+.eds-logo::after {
+  content: attr(data-initial);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--eds-accent);
+  background: var(--eds-accent-soft);
+}
+
+.eds-body { min-width: 0; }
+.eds-name { font-size: 1rem; font-weight: 620; line-height: 1.35; overflow-wrap: anywhere; }
+.eds-org { font-size: .82rem; color: var(--eds-muted); margin-top: .05rem; }
+.eds-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .72rem;
+  color: var(--eds-faint);
+  margin-top: .2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.eds-desc {
+  font-size: .85rem;
+  color: var(--eds-muted);
+  margin: .45rem 0 0;
+  padding: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.eds-tags { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .55rem; }
+.eds-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .7rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: .18rem .55rem;
+  background: var(--eds-soft);
+  color: var(--eds-muted);
+  border: 1px solid var(--eds-line);
+}
+.eds-tag-mark {
+  background: var(--eds-success-soft);
+  color: var(--eds-success);
+  border-color: var(--eds-success-line);
+}
+.eds-tag-mark svg.eds-icon { width: .8rem; height: .8rem; stroke-width: 2.5; }
+
+.eds-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: center;
+  gap: .35rem;
+}
+.eds-info { font-size: .75rem; text-align: center; color: var(--eds-muted); }
+.eds-info:hover, .eds-info:focus { color: var(--eds-accent-hover); }
+
+/* Empty state -------------------------------------------------------------- */
+
+.eds-empty {
+  text-align: center;
+  border: 1px dashed var(--eds-line-strong);
+  border-radius: var(--eds-radius);
+  background: var(--eds-soft);
+  padding: 2.4rem 1rem;
+  color: var(--eds-muted);
+}
+.eds-empty svg.eds-icon { width: 1.85rem; height: 1.85rem; color: var(--eds-faint); }
+.eds-empty p { margin: .6rem 0 1rem; padding: 0; font-size: .95rem; }
+
+/* Pager and footer --------------------------------------------------------- */
+
+.eds-pager {
+  display: flex;
+  gap: .75rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1.15rem;
+}
+.eds-pager span { font-size: .8rem; color: var(--eds-faint); }
+
+.eds-foot {
+  margin-top: 1.8rem;
+  padding-top: .9rem;
+  border-top: 1px solid var(--eds-line);
+  font-size: .78rem;
+  color: var(--eds-muted);
+}
+.eds-foot code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .74rem;
+  overflow-wrap: anywhere;
+}
+
+/* Narrow screens ----------------------------------------------------------- */
+
+@media (max-width: 46rem) {
+  .eds-item { grid-template-columns: 2.75rem minmax(0, 1fr); }
+  .eds-actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    gap: .9rem;
+    margin-top: .3rem;
+  }
+  .eds-meta code { max-width: 13rem; }
+  .eds-field-grow { flex-basis: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eds-item,
+  .eds-btn,
+  .eds a.eds-btn { transition: none; }
+  .eds-item:hover { transform: none; }
+}
