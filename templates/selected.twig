@@ -9,18 +9,98 @@
     text-transform: uppercase; letter-spacing: .04em; margin: 0 0 .15rem; }
   .eds-picked dd { margin: 0 0 .6rem; overflow-wrap: anywhere; }
   .eds-picked dd:last-child { margin-bottom: 0; }
+  .eds-chain { list-style: none; margin: 0; padding: 0; font-size: .85rem; }
+  .eds-chain li { padding-left: 1.1rem; position: relative; overflow-wrap: anywhere; }
+  .eds-chain li + li::before { content: "\2191"; position: absolute; left: .2rem; color: #6b6b6b; }
+  .eds-marks { list-style: none; margin: 0; padding: 0; font-size: .85rem; }
+  .eds-marks li { overflow-wrap: anywhere; }
+  .eds-mark-ok { color: #1e6b34; }
+  .eds-mark-bad { color: #8a2b2b; }
+  .eds-detail { display: block; margin-top: .4rem; font-family: monospace;
+    font-size: .72rem; overflow-wrap: anywhere; }
+  .eds-metadata { max-height: 22rem; overflow: auto; background: #f7f8fa;
+    border: 1px solid #dcdcdc; border-radius: 6px; padding: .6rem;
+    font-size: .75rem; }
 </style>
 {% endblock %}
 
 {% block content %}
   <h2>{{ pagetitle }}</h2>
 
+  {% if verified %}
+    <div class="message-box">
+      {% trans %}Verified: a Trust Chain was resolved from this provider up to
+      the Trust Anchor, and the metadata below is what the federation's policy
+      leaves after applying it.{% endtrans %}
+    </div>
+  {% elseif verificationSkipped %}
+    <div class="message-box">
+      {% if usingMockData %}
+        {% trans %}Fixture data, so there is no federation to verify this
+        provider against.{% endtrans %}
+      {% else %}
+        {% trans %}Verification is turned off, so this provider was taken at its
+        word.{% endtrans %}
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="message-box message-box-error">
+      {% trans %}Not verified: no Trust Chain could be resolved from this
+      provider up to the Trust Anchor, so it cannot be shown to be part of this
+      federation. An authentication request must not be sent to it.{% endtrans %}
+      {% if verificationError %}
+        <code class="eds-detail">{{ verificationError }}</code>
+      {% endif %}
+    </div>
+  {% endif %}
+
   <dl class="eds-picked">
     <dt>{% trans %}Provider{% endtrans %}</dt>
+    <dd>{{ displayName }}</dd>
+
+    <dt>{% trans %}Entity ID{% endtrans %}</dt>
     <dd><code>{{ entityId }}</code></dd>
+
     <dt>{% trans %}Trust Anchor{% endtrans %}</dt>
     <dd><code>{{ trustAnchorId }}</code></dd>
+
+    {% if chain|length > 0 %}
+      <dt>{% trans %}Trust Chain{% endtrans %}</dt>
+      <dd>
+        <ul class="eds-chain">
+          {% for chainEntityId in chain %}
+            <li><code>{{ chainEntityId }}</code></li>
+          {% endfor %}
+        </ul>
+      </dd>
+    {% endif %}
+
+    {% if expiresAt %}
+      <dt>{% trans %}Chain valid until{% endtrans %}</dt>
+      <dd>{{ expiresAt|date('Y-m-d H:i') }}</dd>
+    {% endif %}
+
+    {% if trustMarks|length > 0 %}
+      <dt>{% trans %}Trust Marks{% endtrans %}</dt>
+      <dd>
+        <ul class="eds-marks">
+          {% for trustMark in trustMarks %}
+            <li class="{{ trustMark.validated ? 'eds-mark-ok' : 'eds-mark-bad' }}">
+              {{ trustMark.validated ? '✓' : '✗' }} <code>{{ trustMark.type }}</code>
+              {% if trustMark.error %}
+                <code class="eds-detail">{{ trustMark.error }}</code>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </dd>
+    {% endif %}
   </dl>
+
+  {% if metadata %}
+    <h3>{% trans %}Resolved metadata{% endtrans %}{% if entityType %} — <code>{{ entityType }}</code>{% endif %}</h3>
+    <pre class="eds-metadata">{{ metadata }}</pre>
+  {% endif %}
 
   <div class="message-box">
     {% trans %}This is where the relying party hand-off belongs. This

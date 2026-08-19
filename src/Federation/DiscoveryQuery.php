@@ -89,6 +89,38 @@ class DiscoveryQuery
 
 
     /**
+     * The same criteria as query parameters for a remote
+     * federation_collection_endpoint, which filters and pages server side.
+     *
+     * The endpoint serves whichever Trust Anchors it knows about, so the anchor
+     * travels with the query rather than being implied by it.
+     *
+     * @param non-empty-string $trustAnchorId
+     * @return array{
+     *     entity_type?: string[],
+     *     trust_mark_type?: string[],
+     *     query?: string,
+     *     trust_anchor?: string,
+     *     limit?: positive-int,
+     *     from?: string,
+     * }
+     */
+    public function toCollectionEndpointParams(string $trustAnchorId): array
+    {
+        $parameters = $this->toFilterCriteria();
+
+        $parameters['trust_anchor'] = $trustAnchorId;
+        $parameters['limit'] = $this->limit;
+
+        if ($this->from !== null) {
+            $parameters['from'] = $this->from;
+        }
+
+        return $parameters;
+    }
+
+
+    /**
      * Normalize a scalar or list query parameter to a list of non-empty strings.
      *
      * @return string[]

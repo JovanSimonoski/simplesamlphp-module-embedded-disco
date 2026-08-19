@@ -38,6 +38,7 @@
   .eds-avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%;
     background: #e8eef5; color: var(--eds-accent); font-weight: 700;
     display: flex; align-items: center; justify-content: center; }
+  .eds-logo { width: 2.5rem; height: 2.5rem; object-fit: contain; }
   .eds-body { min-width: 0; }
   .eds-name { font-weight: 600; }
   .eds-org { font-size: .8rem; color: var(--eds-muted); }
@@ -57,6 +58,8 @@
   .eds-foot { margin-top: 1.5rem; padding-top: .75rem;
     border-top: 1px solid var(--eds-line); font-size: .78rem; color: var(--eds-muted); }
   .eds-foot code { overflow-wrap: anywhere; }
+  .eds-detail { display: block; margin-top: .4rem; font-family: monospace;
+    font-size: .72rem; overflow-wrap: anywhere; }
 
   @media (max-width: 40rem) {
     .eds-item { grid-template-columns: 2.5rem 1fr; }
@@ -77,7 +80,18 @@
 
   {% if usingMockData %}
     <div class="message-box">
-      {% trans %}Mock federation data. No network discovery is performed.{% endtrans %}
+      {% trans %}Fixture data. No federation is contacted, and selections are not verified.{% endtrans %}
+    </div>
+  {% endif %}
+
+  {% if discoveryFailed %}
+    <div class="message-box message-box-error">
+      {% trans %}The federation could not be read, so no providers can be offered.
+      The Trust Anchor is unreachable or is not answering with a valid Entity
+      Configuration.{% endtrans %}
+      {% if discoveryError %}
+        <code class="eds-detail">{{ discoveryError }}</code>
+      {% endif %}
     </div>
   {% endif %}
 
@@ -86,16 +100,36 @@
       <dt>{% trans %}Trust Anchor{% endtrans %}</dt>
       <dd><code>{{ trustAnchorId }}</code></dd>
     </div>
+    <div class="eds-fact">
+      <dt>{% trans %}Source{% endtrans %}</dt>
+      <dd>
+        {% if discoverySource == 'mock' %}
+          {% trans %}bundled fixture{% endtrans %}
+        {% elseif discoverySource == 'collection_endpoint' %}
+          {% trans %}collection endpoint{% endtrans %}
+        {% else %}
+          {% trans %}federation traversal{% endtrans %}
+        {% endif %}
+      </dd>
+    </div>
     {% if lastUpdated %}
       <div class="eds-fact">
         <dt>{% trans %}Discovered{% endtrans %}</dt>
         <dd>{{ lastUpdated|date('Y-m-d H:i') }}</dd>
       </div>
     {% endif %}
-    <div class="eds-fact">
-      <dt>{% trans %}Matching{% endtrans %}</dt>
-      <dd>{{ total }}</dd>
-    </div>
+    {% if total is not null %}
+      <div class="eds-fact">
+        <dt>{% trans %}Matching{% endtrans %}</dt>
+        <dd>{{ total }}</dd>
+      </div>
+    {% endif %}
+    {% if refreshUrl %}
+      <div class="eds-fact">
+        <dt>{% trans %}Cache{% endtrans %}</dt>
+        <dd><a href="{{ refreshUrl }}">{% trans %}Discover again{% endtrans %}</a></dd>
+      </div>
+    {% endif %}
   </dl>
 
   <form method="get" action="{{ formUrl }}" class="eds-toolbar">
@@ -133,13 +167,21 @@
   </form>
 
   {% if entities|length == 0 %}
-    <div class="message-box message-box-error">
-      {% trans %}No providers match these filters.{% endtrans %}
-      <a href="{{ resetUrl }}">{% trans %}Clear filters{% endtrans %}</a>
-    </div>
+    {% if not discoveryFailed %}
+      <div class="message-box message-box-error">
+        {% trans %}No providers match these filters.{% endtrans %}
+        <a href="{{ resetUrl }}">{% trans %}Clear filters{% endtrans %}</a>
+      </div>
+    {% endif %}
   {% else %}
     <div class="eds-count">
-      <span>{{ entities|length }} {% trans %}of{% endtrans %} {{ total }} {% trans %}shown{% endtrans %}</span>
+      <span>
+        {%- if total is null -%}
+          {{ entities|length }} {% trans %}shown{% endtrans %}
+        {%- else -%}
+          {{ entities|length }} {% trans %}of{% endtrans %} {{ total }} {% trans %}shown{% endtrans %}
+        {%- endif -%}
+      </span>
       {% if query or nextPageUrl %}
         <a href="{{ resetUrl }}">{% trans %}Reset{% endtrans %}</a>
       {% endif %}
@@ -148,7 +190,13 @@
     <ul class="eds-list">
       {% for entity in entities %}
         <li class="eds-item">
-          <div class="eds-avatar" aria-hidden="true">{{ entity.displayName|slice(0, 1)|upper }}</div>
+          {% if entity.logoUri %}
+            {# Loaded straight from the provider, so the browser tells it a user is picking. #}
+            <img class="eds-logo" src="{{ entity.logoUri }}" alt=""
+                 loading="lazy" referrerpolicy="no-referrer">
+          {% else %}
+            <div class="eds-avatar" aria-hidden="true">{{ entity.displayName|slice(0, 1)|upper }}</div>
+          {% endif %}
 
           <div class="eds-body">
             <div class="eds-name">{{ entity.displayName }}</div>
@@ -164,8 +212,11 @@
                 <span class="eds-tag">{{ entityType }}</span>
               {% endfor %}
               {% for trustMarkType in entity.trustMarkTypes %}
-                <span class="eds-tag eds-tag-mark" title="{{ trustMarkType }}">
-                  &#10003; {{ trustMarkType|split('/')|last }}
+                {# Claimed, not checked: validating a Trust Mark costs a Trust Chain
+                   resolution, which happens once the provider is picked. #}
+                <span class="eds-tag eds-tag-mark"
+                      title="{% trans %}Claimed Trust Mark, validated on selection{% endtrans %}: {{ trustMarkType }}">
+                  {{ trustMarkType|split('/')|last }}
                 </span>
               {% endfor %}
             </div>

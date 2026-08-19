@@ -5,7 +5,15 @@ declare(strict_types=1);
 namespace SimpleSAML\Module\embeddeddisco;
 
 use SimpleSAML\Configuration;
+use SimpleSAML\OpenID\Algorithms\SignatureAlgorithmEnum;
 use SimpleSAML\OpenID\Codebooks\EntityTypesEnum;
+
+use function array_filter;
+use function array_values;
+use function is_string;
+use function max;
+use function rtrim;
+use function sys_get_temp_dir;
 
 /**
  * Typed access to config/module_embeddeddisco.php.
@@ -30,14 +38,40 @@ class ModuleConfig
 
     public const string OPTION_MAX_DISCOVERY_DEPTH = 'max_discovery_depth';
 
+    public const string OPTION_MAX_DISCOVERED_ENTITIES = 'max_discovered_entities';
+
+    public const string OPTION_COLLECTION_ENDPOINT = 'collection_endpoint';
+
+    public const string OPTION_HTTP_CONNECT_TIMEOUT = 'http_connect_timeout';
+
+    public const string OPTION_HTTP_TIMEOUT = 'http_timeout';
+
+    public const string OPTION_VERIFY_SELECTION = 'verify_selection';
+
+    public const string OPTION_VALIDATE_TRUST_MARKS = 'validate_trust_marks';
+
+    public const string OPTION_EXPOSE_ERROR_DETAILS = 'expose_error_details';
+
+    public const string OPTION_SIGNATURE_ALGORITHMS = 'signature_algorithms';
+
     public const string OPTION_CACHE_DIRECTORY = 'cache_directory';
 
     public const string OPTION_CACHE_DURATION = 'cache_duration';
 
     /**
-     * Fallback Trust Anchor, used when the module has no config file.
+     * Ask the Trust Anchor's own Entity Configuration whether it offers a
+     * federation_collection_endpoint, instead of naming one here.
      */
-    public const string DEFAULT_TRUST_ANCHOR_ID = 'https://ta.embedded-disco.test';
+    public const string COLLECTION_ENDPOINT_AUTO = 'auto';
+
+    /**
+     * Fallback Trust Anchor, used when the module has no config file.
+     *
+     * The GÉANT Trust and Identity Incubator runs this one as an OpenID
+     * Federation testbed; its subordinates are the demo OP and RP on the same
+     * domain.
+     */
+    public const string DEFAULT_TRUST_ANCHOR_ID = 'https://oidfed-ta-demo.incubator.geant.org';
 
 
     protected Configuration $config;
@@ -105,15 +139,169 @@ class ModuleConfig
     }
 
 
+    /**
+     * Serve discovery from the bundled fixture instead of a live federation.
+     *
+     * Off by default: the module talks to a real federation, and the fixture is
+     * only there for offline demos and tests.
+     */
     public function useMockData(): bool
     {
-        return $this->config->getOptionalBoolean(self::OPTION_USE_MOCK_DATA, true);
+        return $this->config->getOptionalBoolean(self::OPTION_USE_MOCK_DATA, false);
     }
 
 
     public function getMaxDiscoveryDepth(): int
     {
         return $this->config->getOptionalInteger(self::OPTION_MAX_DISCOVERY_DEPTH, 10);
+    }
+
+
+    /**
+     * Ceiling on how many entities one traversal may collect. Depth alone does
+     * not bound the work, since a single listing can name any number of
+     * subordinates.
+     *
+     * @return positive-int
+     */
+    public function getMaxDiscoveredEntities(): int
+    {
+        return max(1, $this->config->getOptionalInteger(self::OPTION_MAX_DISCOVERED_ENTITIES, 1000));
+    }
+
+
+    /**
+     * A remote federation_collection_endpoint to read the entity collection
+     * from, 'auto' to take it from the Trust Anchor's Entity Configuration, or
+     * null to always traverse.
+     *
+     * Turning it off is configured as false rather than null: SimpleSAMLphp's
+     * Configuration reads a null value as "not set", so null would silently mean
+     * 'auto' here.
+     */
+    public function getCollectionEndpoint(): ?string
+    {
+        $value = $this->config->getOptionalValue(
+            self::OPTION_COLLECTION_ENDPOINT,
+            self::COLLECTION_ENDPOINT_AUTO,
+        );
+
+        if ($value === false || $value === '') {
+            return null;
+        }
+
+        return is_string($value) ? $value : self::COLLECTION_ENDPOINT_AUTO;
+    }
+
+
+    public function isCollectionEndpointAutomatic(): bool
+    {
+        return $this->getCollectionEndpoint() === self::COLLECTION_ENDPOINT_AUTO;
+    }
+
+
+    /**
+     * Seconds to wait for a federation endpoint to accept the connection. This
+     * is what bounds a Trust Anchor that is simply dark, rather than slow.
+     */
+    public function getHttpConnectTimeout(): float
+    {
+        return max(0.1, (float) $this->config->getOptionalValue(self::OPTION_HTTP_CONNECT_TIMEOUT, 3));
+    }
+
+
+    /**
+     * Seconds to wait for a single federation request to complete.
+     */
+    public function getHttpTimeout(): float
+    {
+        return max(0.1, (float) $this->config->getOptionalValue(self::OPTION_HTTP_TIMEOUT, 5));
+    }
+
+
+    /**
+     * Resolve a Trust Chain for the entity the user picked before handing off
+     * to it. Discovery itself only lists candidates; this is what establishes
+     * that the candidate really is part of the federation.
+     */
+    public function verifySelection(): bool
+    {
+        return $this->config->getOptionalBoolean(self::OPTION_VERIFY_SELECTION, true);
+    }
+
+
+    /**
+     * Validate the picked entity's Trust Marks (signature, issuer, delegation)
+     * rather than trusting the self-asserted trust_mark_type alone.
+     */
+    public function validateTrustMarks(): bool
+    {
+        return $this->config->getOptionalBoolean(self::OPTION_VALIDATE_TRUST_MARKS, true);
+    }
+
+
+    /**
+     * Show the technical reason a discovery or verification failed in the UI.
+     * Useful while integrating, noise (and information disclosure) in front of
+     * end users.
+     */
+    public function exposeErrorDetails(): bool
+    {
+        return $this->config->getOptionalBoolean(self::OPTION_EXPOSE_ERROR_DETAILS, true);
+    }
+
+
+    /**
+     * Signature algorithms an entity statement may be signed with.
+     *
+     * The library defaults to RS256 alone, which is not enough to read a real
+     * federation: the demo federations already sign with ES256 and ES512, and a
+     * statement signed with an algorithm that is not enabled does not fail
+     * loudly -- it makes the Trust Chain unresolvable.
+     *
+     * "none" is dropped wherever it is configured. Accepting it would mean
+     * accepting an unsigned entity statement as valid.
+     *
+     * @return non-empty-array<int, \SimpleSAML\OpenID\Algorithms\SignatureAlgorithmEnum>
+     */
+    public function getSignatureAlgorithms(): array
+    {
+        $configured = $this->config->getOptionalArray(self::OPTION_SIGNATURE_ALGORITHMS, null);
+
+        if ($configured === null) {
+            return self::defaultSignatureAlgorithms();
+        }
+
+        $algorithms = [];
+
+        foreach ($configured as $name) {
+            $signatureAlgorithmEnum = is_string($name) ? SignatureAlgorithmEnum::tryFrom($name) : null;
+
+            if ($signatureAlgorithmEnum === null || $signatureAlgorithmEnum->isNone()) {
+                continue;
+            }
+
+            $algorithms[] = $signatureAlgorithmEnum;
+        }
+
+        return $algorithms === [] ? self::defaultSignatureAlgorithms() : $algorithms;
+    }
+
+
+    /**
+     * Every algorithm the library can verify, except "none".
+     *
+     * @return non-empty-array<int, \SimpleSAML\OpenID\Algorithms\SignatureAlgorithmEnum>
+     */
+    protected static function defaultSignatureAlgorithms(): array
+    {
+        /** @var non-empty-array<int, \SimpleSAML\OpenID\Algorithms\SignatureAlgorithmEnum> $algorithms */
+        $algorithms = array_values(array_filter(
+            SignatureAlgorithmEnum::cases(),
+            static fn(SignatureAlgorithmEnum $signatureAlgorithmEnum): bool => !$signatureAlgorithmEnum->isNone(),
+        ));
+
+        return $algorithms;
     }
 
 
