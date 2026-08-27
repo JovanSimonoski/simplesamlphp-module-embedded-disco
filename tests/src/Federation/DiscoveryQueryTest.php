@@ -50,19 +50,26 @@ class DiscoveryQueryTest extends TestCase
     }
 
 
-    public function testEntityTypeArrivesAsAScalarFromTheFormAndAsAListFromAnApiCaller(): void
+    public function testEntityTypesComeFromConfigurationAndCannotBeSetByTheRequest(): void
     {
-        $fromForm = DiscoveryQuery::fromRequest(
+        // Only an OpenID Provider can authenticate anyone, so what the picker
+        // offers is a deployment decision. A hand-edited URL must not be able to
+        // put Relying Parties or intermediate authorities in front of a user.
+        $moduleConfig = $this->moduleConfig([
+            ModuleConfig::OPTION_ENTITY_TYPES => [EntityTypesEnum::OpenIdProvider->value],
+        ]);
+
+        $fromScalar = DiscoveryQuery::fromRequest(
             $this->request(['entity_type' => EntityTypesEnum::FederationEntity->value]),
-            $this->moduleConfig(),
+            $moduleConfig,
         );
-        $fromApi = DiscoveryQuery::fromRequest(
-            $this->request(['entity_type' => [EntityTypesEnum::FederationEntity->value, '']]),
-            $this->moduleConfig(),
+        $fromList = DiscoveryQuery::fromRequest(
+            $this->request(['entity_type' => [EntityTypesEnum::OpenIdRelyingParty->value]]),
+            $moduleConfig,
         );
 
-        $this->assertSame([EntityTypesEnum::FederationEntity->value], $fromForm->entityTypes);
-        $this->assertSame([EntityTypesEnum::FederationEntity->value], $fromApi->entityTypes);
+        $this->assertSame([EntityTypesEnum::OpenIdProvider->value], $fromScalar->entityTypes);
+        $this->assertSame([EntityTypesEnum::OpenIdProvider->value], $fromList->entityTypes);
     }
 
 

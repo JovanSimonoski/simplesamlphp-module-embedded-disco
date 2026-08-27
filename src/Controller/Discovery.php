@@ -12,7 +12,6 @@ use SimpleSAML\Module\embeddeddisco\Federation\DiscoveryService;
 use SimpleSAML\Module\embeddeddisco\Federation\FederationFactory;
 use SimpleSAML\Module\embeddeddisco\Federation\TrustChainService;
 use SimpleSAML\Module\embeddeddisco\ModuleConfig;
-use SimpleSAML\OpenID\Codebooks\EntityTypesEnum;
 use SimpleSAML\Session;
 use SimpleSAML\Utils\Auth;
 use SimpleSAML\Utils\HTTP;
@@ -95,12 +94,6 @@ class Discovery
         $template->data['trustAnchorId'] = $result->trustAnchorId;
         $template->data['query'] = $discoveryQuery->query;
         $template->data['sortOrder'] = $discoveryQuery->sortOrder;
-        $template->data['entityTypes'] = $discoveryQuery->entityTypes;
-        $template->data['availableEntityTypes'] = [
-            EntityTypesEnum::OpenIdProvider->value,
-            EntityTypesEnum::OpenIdRelyingParty->value,
-            EntityTypesEnum::FederationEntity->value,
-        ];
         $template->data['usingMockData'] = $this->moduleConfig->useMockData();
         $template->data['discoverySource'] = $result->source->value;
         $template->data['discoveryFailed'] = $result->hasFailed();
@@ -216,10 +209,8 @@ class Discovery
             $parameters['query'] = $discoveryQuery->query;
         }
 
-        if ($discoveryQuery->entityTypes !== []) {
-            $parameters['entity_type'] = $discoveryQuery->entityTypes;
-        }
-
+        // No entity_type: the picker serves the configured types, so carrying
+        // them in the URL would only invite editing them there.
         if ($discoveryQuery->sortOrder !== 'asc') {
             $parameters['sort_dir'] = $discoveryQuery->sortOrder;
         }

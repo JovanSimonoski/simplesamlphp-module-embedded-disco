@@ -37,7 +37,7 @@ relying party.
 
 | Endpoint | Purpose |
 | --- | --- |
-| `module.php/embeddeddisco/disco` | The embedded picker (search, filter, sort, paginate) |
+| `module.php/embeddeddisco/disco` | The embedded picker (search, sort, paginate) |
 | `module.php/embeddeddisco/entities` | Same result set as an OpenID Federation entity collection response |
 | `module.php/embeddeddisco/select` | Trust Chain verification of the picked entity, then the RP hand-off (stub) |
 | `module.php/embeddeddisco/status` | Wiring smoke test, including whether the Trust Anchor is reachable |
@@ -84,7 +84,7 @@ Nothing in the module is specific to either; the Trust Anchor is one config line
 | Option | Default | What it does |
 | --- | --- | --- |
 | `trust_anchor_id` | GÉANT demo TA | The anchor everything is discovered beneath |
-| `entity_types` | `['openid_provider']` | Types the picker offers |
+| `entity_types` | `['openid_provider']` | Types the picker offers — configuration, not a user control |
 | `required_trust_mark_types` | `[]` | Only offer entities claiming all of these |
 | `page_size` | `6` | Results per page |
 | `sort_order` | `'asc'` | Display-name sort direction |

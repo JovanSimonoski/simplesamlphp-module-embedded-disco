@@ -117,17 +117,9 @@
       </div>
     </div>
 
-    <div class="eds-field">
-      <label for="eds-entity-type">{% trans %}Entity type{% endtrans %}</label>
-      <select id="eds-entity-type" name="entity_type">
-        {% for availableEntityType in availableEntityTypes %}
-          <option value="{{ availableEntityType }}"
-            {%- if availableEntityType in entityTypes %} selected{% endif %}>
-            {{ availableEntityType }}
-          </option>
-        {% endfor %}
-      </select>
-    </div>
+    {# No entity type control: only an OpenID Provider can authenticate anyone,
+       so which types are offered is configuration (entity_types), not a choice
+       to put in front of the person logging in. #}
 
     <div class="eds-field">
       <label for="eds-sort-dir">{% trans %}Sort{% endtrans %}</label>

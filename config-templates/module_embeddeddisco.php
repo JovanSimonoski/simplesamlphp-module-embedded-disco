@@ -32,6 +32,13 @@ $config = [
 
     // Entity types offered in the picker. An RP discovering where to send the
     // user wants OPs, so that is the default.
+    //
+    // Deliberately not exposed as a control on the page, and not read from the
+    // request: only an OpenID Provider can authenticate anyone, so a Relying
+    // Party or an intermediate authority in the list would be a row a user can
+    // click but not use. Other types are still discovered -- the traversal has
+    // to walk through the intermediates to reach the providers -- they are just
+    // never offered.
     ModuleConfig::OPTION_ENTITY_TYPES => [
         EntityTypesEnum::OpenIdProvider->value,
     ],

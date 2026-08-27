@@ -42,9 +42,9 @@ class DiscoveryQuery
 
     public static function fromRequest(Request $request, ModuleConfig $moduleConfig): self
     {
-        // Read the bag wholesale: entity_type and trust_mark_type arrive as a
-        // scalar from the picker's <select> and as a list from an API caller,
-        // and InputBag::all($key) rejects the scalar form outright.
+        // Read the bag wholesale: trust_mark_type arrives as a scalar from a
+        // form and as a list from an API caller, and InputBag::all($key) rejects
+        // the scalar form outright.
         $parameters = $request->query->all();
 
         $sortOrder = $parameters['sort_dir'] ?? null;
@@ -52,8 +52,12 @@ class DiscoveryQuery
 
         return new self(
             query: is_string($query) ? trim($query) : '',
-            entityTypes: self::stringList($parameters['entity_type'] ?? null)
-                ?: $moduleConfig->getEntityTypes(),
+            // Not taken from the request. Which entity types a picker offers is
+            // a property of the deployment, not a choice the person logging in
+            // gets to make: only an OpenID Provider can authenticate them, and
+            // a Relying Party or an intermediate authority in the list would be
+            // a row that cannot lead anywhere.
+            entityTypes: $moduleConfig->getEntityTypes(),
             trustMarkTypes: self::stringList($parameters['trust_mark_type'] ?? null)
                 ?: $moduleConfig->getRequiredTrustMarkTypes(),
             limit: $moduleConfig->getPageSize(),
