@@ -2,6 +2,12 @@
 #   docker compose -f docker/docker-compose.yml up --build
 # Then browse to https://localhost:8443/simplesaml/ (self-signed cert warning is
 # expected -- the base image ships a development certificate).
+#
+# Two services:
+#   ssp  the relying party, with this module -- the discovery picker
+#   op   a local OpenID Provider to log in against
+#
+# The OP needs a certificate first:  bash docker/op/make-certs.sh
 services:
   ssp:
     build:
@@ -27,3 +33,38 @@ services:
       - ./ssp/authsources.php:/var/simplesamlphp/config/authsources.php:ro
       - ./ssp/config-override.php:/var/simplesamlphp/config/config-override.php:ro
       - ../config-templates/module_embeddeddisco.php:/var/simplesamlphp/config/module_embeddeddisco.php:ro
+      # The OP's certificate, so the relying party can verify it when it fetches
+      # metadata and exchanges the authorization code (http_ca_bundle).
+      - ./op/tls/op.crt:/var/simplesamlphp/cert/op-ca.crt:ro
+
+  # Local OpenID Provider: stock SimpleSAMLphp plus simplesamlphp-module-oidc,
+  # the same stack GEANT's demo OP runs, so it speaks OpenID Federation and can
+  # later accept the relying party through automatic registration.
+  op:
+    image: "cirrusid/simplesamlphp:${SSP_VERSION:-v2.5.0}"
+    hostname: op.local
+    ports:
+      - "8444:443"
+    environment:
+      - COMPOSER_REQUIRE=simplesamlphp/simplesamlphp-module-oidc
+      - SSP_ADMIN_PASSWORD=secret1
+      - SSP_ENABLED_MODULES=exampleauth oidc
+      - SSP_LOG_LEVEL=7
+      - SSP_SECRET_SALT=optestsalt
+      # The image picks its TLS certificate by name; ours is valid for
+      # host.docker.internal, which the image's own certificate is not (and it
+      # expired in June 2026 besides).
+      - APACHE_CERT_NAME=op-demo
+      # Read by the client registration script in run-on-start.sh.
+      - OP_CLIENT_ID=embedded-disco-rp
+      - OP_CLIENT_SECRET=embedded-disco-secret
+      - OP_CLIENT_REDIRECT_URI=https://localhost:8443/simplesaml/module.php/embeddeddisco/callback
+    volumes:
+      - ./op/ssp/authsources.php:/var/simplesamlphp/config/authsources.php:ro
+      - ./op/ssp/config-override.php:/var/simplesamlphp/config/config-override.php:ro
+      - ./op/ssp/module_oidc.php:/var/simplesamlphp/config/module_oidc.php:ro
+      - ./op/run-on-start.sh:/opt/simplesaml/run-on-start.sh:ro
+      - ./op/register-client.php:/opt/simplesaml/register-client.php:ro
+      # Serves the name the RP and the browser both use.
+      - ./op/tls/op.crt:/etc/ssl/certs/op-demo.pem:ro
+      - ./op/tls/op.key:/etc/ssl/private/op-demo.key:ro

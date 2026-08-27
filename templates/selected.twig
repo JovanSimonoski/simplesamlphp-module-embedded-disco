@@ -54,6 +54,14 @@
     </div>
   {% endif %}
 
+  {% if loginError %}
+    <div class="message-box message-box-error">
+      {% trans %}This provider is part of the federation, but no login could be
+      started with it.{% endtrans %}
+      <code class="eds-detail">{{ loginError }}</code>
+    </div>
+  {% endif %}
+
   <dl class="eds-picked">
     <dt>{% trans %}Provider{% endtrans %}</dt>
     <dd>{{ displayName }}</dd>

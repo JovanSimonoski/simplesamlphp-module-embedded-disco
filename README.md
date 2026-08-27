@@ -28,22 +28,52 @@ even though the repository is not.
 
 ## Status
 
-The picker runs against a **live federation**: it fetches the Trust Anchor's
-Entity Configuration, walks the federation, and renders what it finds. Picking a
-provider resolves a Trust Chain for it and shows the policy-resolved metadata.
-What is still missing is the last step — starting an authentication request —
-because this SimpleSAMLphp instance is not registered as an OpenID Connect
-relying party.
+The picker runs against a **live federation** and **logs people in**. It fetches
+the Trust Anchor's Entity Configuration, walks the federation, and renders what
+it finds. Picking a provider resolves a Trust Chain for it, and — inside a login
+— redirects to that provider's authorization endpoint, handles the callback,
+validates the ID token against the keys the federation published, and completes
+the SimpleSAMLphp session.
 
 | Endpoint | Purpose |
 | --- | --- |
 | `module.php/embeddeddisco/disco` | The embedded picker (search, sort, paginate) |
 | `module.php/embeddeddisco/entities` | Same result set as an OpenID Federation entity collection response |
-| `module.php/embeddeddisco/select` | Trust Chain verification of the picked entity, then the RP hand-off (stub) |
+| `module.php/embeddeddisco/select` | Trust Chain verification, then the hand-off to the provider |
+| `module.php/embeddeddisco/callback` | Where the provider returns the user; token exchange and ID token validation |
 | `module.php/embeddeddisco/status` | Wiring smoke test, including whether the Trust Anchor is reachable |
+
+Configured as an authentication source, so anything on this installation can use
+federated discovery without knowing about it:
+
+```php
+'embedded-disco' => [
+    'embeddeddisco:OpenIdFederation',
+],
+```
 
 The bundled fixture is still there behind `use_mock_data`, for demoing offline
 and for the tests. It is off by default.
+
+### What still uses a shared secret
+
+The one part that is not yet federation-native is how this relying party
+identifies itself to a provider. OpenID Federation's answer is **automatic
+registration**: the RP's entity ID *is* its client ID, and the provider validates
+it by fetching the RP's own Entity Configuration and resolving *its* Trust Chain
+— no client secret exists anywhere. That requires this deployment to be published
+as a federation entity at a URL the provider can reach, and enrolled under the
+Trust Anchor. Until then a provider has to be told about us the ordinary way, via
+the `clients` option.
+
+This is also why the public demo providers cannot be logged in to. Asked to
+start a login, `https://op-uni.hier.fed.oidfed.com` answers:
+
+```
+400 {"error":"invalid_client","error_description":"client is invalid"}
+```
+
+It is not a bug in the module; we are simply not a member of that federation.
 
 ## The federation it points at
 
@@ -344,6 +374,51 @@ docker compose -f docker/docker-compose.yml up --build -d
 Rebuild only when `composer.json` changes; otherwise `up -d` is enough. Follow
 logs with `docker compose -f docker/docker-compose.yml logs -f ssp`.
 
+### The local OpenID Provider
+
+`docker compose` brings up two services: `ssp`, the relying party with this
+module, and `op`, a SimpleSAMLphp with `simplesamlphp-module-oidc` — the same
+stack GÉANT's demo provider runs, so it speaks OpenID Federation and publishes
+its own Entity Configuration.
+
+Generate its certificate once before the first start:
+
+```bash
+bash docker/op/make-certs.sh
+docker compose -f docker/docker-compose.yml up -d
+```
+
+The certificate names `host.docker.internal`, which resolves both from the host
+browser and from inside the relying party container. That matters more than it
+sounds: the issuer in an ID token has to be the same string the RP fetched the
+provider's metadata from, so both sides need one URL that means the same thing.
+The relying party trusts that certificate through `http_ca_bundle`, which adds a
+CA rather than turning verification off.
+
+On start the OP generates its signing keys, runs its database migrations against
+SQLite, and registers this relying party as a client — see
+`docker/op/run-on-start.sh`, which the image runs before Apache.
+
+| What | Where |
+| --- | --- |
+| Provider issuer | `https://host.docker.internal:8444/simplesaml/module.php/oidc` |
+| Its Entity Configuration | `…/module.php/oidc/.well-known/openid-federation` |
+| Provider admin | <https://host.docker.internal:8444/simplesaml/> — `admin` / `secret1` |
+| Test users | `student` / `studentpass`, `staff` / `staffpass` |
+
+By default `trust_anchor_id` points at this provider, which acts as its own Trust
+Anchor — a one-entity federation, degenerate but legitimate, and the one where a
+login can be completed end to end. Point it at `https://ta.hier.fed.oidfed.com`
+instead to show discovery across a real multi-level federation.
+
+### Trying the login
+
+<https://localhost:8443/simplesaml/module.php/admin/test/embedded-disco>
+
+Log in as the SSP administrator, and the whole flow runs: the picker appears,
+Select verifies the Trust Chain and redirects to the provider, you authenticate
+there as `student`, and SimpleSAMLphp shows the claims that came back.
+
 ### Either way
 
 Browse to <https://localhost:8443/simplesaml/>. The base image ships a
@@ -403,10 +478,12 @@ Against `ta.hier`, discovery finds 7 entities (2 of them OPs), and selecting
 
 ## Not done yet
 
-* **The RP hand-off.** `select` verifies and then stops. Starting an
-  authentication request needs this SimpleSAMLphp to be registered as an OpenID
-  Connect relying party in the federation (automatic registration, from its own
-  Entity Configuration), which is a separate piece of work.
+* **Automatic client registration.** The login works, but this relying party
+  identifies itself with a client ID and secret configured per provider. The
+  federation-native way is for the RP to publish its own Entity Configuration and
+  be enrolled under the Trust Anchor, after which its entity ID is its client ID
+  and no secret exists. That is the remaining step to being a full federation
+  member rather than a well-informed outsider.
 * **Trust Mark validation against real marks.** The code path is there and runs,
   but no entity in any reachable demo federation publishes a `trust_marks` claim,
   so it has only been exercised against the fixture's unsigned types.

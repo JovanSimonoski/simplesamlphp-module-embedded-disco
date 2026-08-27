@@ -112,9 +112,20 @@ class FederationFactory
      */
     protected function buildHttpClientConfig(): array
     {
-        return [
+        $config = [
             RequestOptions::CONNECT_TIMEOUT => $this->moduleConfig->getHttpConnectTimeout(),
             RequestOptions::TIMEOUT => $this->moduleConfig->getHttpTimeout(),
         ];
+
+        // A path here means "also trust this CA", which is what a private
+        // federation needs. Guzzle keeps verifying; it just verifies against
+        // this bundle.
+        $caBundle = $this->moduleConfig->getHttpCaBundle();
+
+        if ($caBundle !== null) {
+            $config[RequestOptions::VERIFY] = $caBundle;
+        }
+
+        return $config;
     }
 }

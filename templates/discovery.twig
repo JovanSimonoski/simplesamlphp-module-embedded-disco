@@ -107,6 +107,8 @@
 
   <form method="get" action="{{ formUrl }}" class="eds-toolbar">
     {% if returnTo %}<input type="hidden" name="ReturnTo" value="{{ returnTo }}">{% endif %}
+    {# Searching must not drop the login this page is a step in. #}
+    {% if authState %}<input type="hidden" name="AuthState" value="{{ authState }}">{% endif %}
 
     <div class="eds-field eds-field-grow">
       <label for="eds-query">{% trans %}Search{% endtrans %}</label>
@@ -199,7 +201,9 @@
 
           <div class="eds-actions">
             <a class="eds-btn eds-btn-primary"
-               href="{{ selectUrl }}?entity_id={{ entity.entityId|url_encode }}{% if returnTo %}&amp;ReturnTo={{ returnTo|url_encode }}{% endif %}">
+               href="{{ selectUrl }}?entity_id={{ entity.entityId|url_encode }}
+                     {%- if returnTo %}&amp;ReturnTo={{ returnTo|url_encode }}{% endif %}
+                     {%- if authState %}&amp;AuthState={{ authState|url_encode }}{% endif %}">
               {% trans %}Select{% endtrans %}
             </a>
             {% if entity.informationUri %}

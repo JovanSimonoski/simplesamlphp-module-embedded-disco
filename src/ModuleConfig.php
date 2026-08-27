@@ -54,6 +54,12 @@ class ModuleConfig
 
     public const string OPTION_SIGNATURE_ALGORITHMS = 'signature_algorithms';
 
+    public const string OPTION_CLIENTS = 'clients';
+
+    public const string OPTION_SCOPES = 'scopes';
+
+    public const string OPTION_HTTP_CA_BUNDLE = 'http_ca_bundle';
+
     public const string OPTION_CACHE_DIRECTORY = 'cache_directory';
 
     public const string OPTION_CACHE_DURATION = 'cache_duration';
@@ -302,6 +308,73 @@ class ModuleConfig
         ));
 
         return $algorithms;
+    }
+
+
+    /**
+     * Client credentials this relying party holds at a given provider, keyed by
+     * the provider's issuer.
+     *
+     * OpenID Federation's own answer to this is automatic registration, where
+     * the RP's entity ID *is* its client ID and the provider validates it by
+     * resolving the RP's own Trust Chain. That needs this deployment published
+     * as a federation entity and enrolled under the Trust Anchor, so until then
+     * a provider has to be told about us the ordinary way.
+     *
+     * @return ?array{client_id: string, client_secret: string, scopes?: string[]}
+     */
+    public function getClientForIssuer(string $issuer): ?array
+    {
+        $clients = $this->config->getOptionalArray(self::OPTION_CLIENTS, []);
+
+        $client = $clients[$issuer] ?? null;
+
+        if (!is_array($client)) {
+            return null;
+        }
+
+        $clientId = $client['client_id'] ?? null;
+        $clientSecret = $client['client_secret'] ?? null;
+
+        if (!is_string($clientId) || $clientId === '' || !is_string($clientSecret) || $clientSecret === '') {
+            return null;
+        }
+
+        /** @var array{client_id: string, client_secret: string, scopes?: string[]} $client */
+        return $client;
+    }
+
+
+    /**
+     * Scopes to ask for, unless the client entry overrides them.
+     *
+     * @return non-empty-array<int, string>
+     */
+    public function getScopes(): array
+    {
+        $scopes = array_values(array_filter(
+            $this->config->getOptionalArray(self::OPTION_SCOPES, ['openid']),
+            static fn(mixed $scope): bool => is_string($scope) && $scope !== '',
+        ));
+
+        /** @var non-empty-array<int, string> $result */
+        $result = $scopes === [] ? ['openid'] : $scopes;
+
+        return $result;
+    }
+
+
+    /**
+     * A CA bundle to verify federation and provider endpoints against, for a
+     * private federation whose certificates a public trust store does not know.
+     *
+     * This adds a trust anchor for TLS; it never turns verification off.
+     */
+    public function getHttpCaBundle(): ?string
+    {
+        $bundle = $this->config->getOptionalString(self::OPTION_HTTP_CA_BUNDLE, null);
+
+        return ($bundle === null || $bundle === '') ? null : $bundle;
     }
 
 

@@ -9,6 +9,14 @@ $config = array(
         'core:AdminPassword',
     ),
 
+    // Log in through a provider discovered in the federation. Visiting the admin
+    // area's "Test authentication sources" page and picking this one runs the
+    // whole flow: the picker, Trust Chain verification, the provider's own login
+    // page, and back here with the claims it issued.
+    'embedded-disco' => [
+        'embeddeddisco:OpenIdFederation',
+    ],
+
     'example-userpass' => [
         'exampleauth:UserPass',
         'users' => [

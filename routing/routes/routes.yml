@@ -21,6 +21,13 @@ embeddeddisco-select:
   }
   methods: [GET]
 
+embeddeddisco-callback:
+  path: /callback
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\Discovery::callback'
+  }
+  methods: [GET]
+
 embeddeddisco-status:
   path: /status
   defaults: {
