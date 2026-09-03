@@ -10,6 +10,7 @@ use SimpleSAML\OpenID\Codebooks\EntityTypesEnum;
 
 use function array_filter;
 use function array_values;
+use function in_array;
 use function is_string;
 use function max;
 use function rtrim;
@@ -58,11 +59,33 @@ class ModuleConfig
 
     public const string OPTION_SCOPES = 'scopes';
 
+    public const string OPTION_FEDERATION_ENTITY_ID = 'federation_entity_id';
+
+    public const string OPTION_FEDERATION_ENTITY_ROLE = 'federation_entity_role';
+
+    public const string OPTION_FEDERATION_AUTHORITY_HINTS = 'federation_authority_hints';
+
+    public const string OPTION_FEDERATION_SUBORDINATES = 'federation_subordinates';
+
+    public const string OPTION_FEDERATION_PRIVATE_KEY = 'federation_private_key';
+
+    public const string OPTION_PROTOCOL_PRIVATE_KEY = 'protocol_private_key';
+
+    public const string OPTION_FEDERATION_REDIRECT_URIS = 'federation_redirect_uris';
+
+    public const string OPTION_FEDERATION_DISPLAY_NAME = 'federation_display_name';
+
+    public const string OPTION_FEDERATION_STATEMENT_TTL = 'federation_statement_ttl';
+
     public const string OPTION_HTTP_CA_BUNDLE = 'http_ca_bundle';
 
     public const string OPTION_CACHE_DIRECTORY = 'cache_directory';
 
     public const string OPTION_CACHE_DURATION = 'cache_duration';
+
+    public const string FEDERATION_ROLE_RELYING_PARTY = 'openid_relying_party';
+
+    public const string FEDERATION_ROLE_TRUST_ANCHOR = 'trust_anchor';
 
     /**
      * Ask the Trust Anchor's own Entity Configuration whether it offers a
@@ -315,11 +338,9 @@ class ModuleConfig
      * Client credentials this relying party holds at a given provider, keyed by
      * the provider's issuer.
      *
-     * OpenID Federation's own answer to this is automatic registration, where
-     * the RP's entity ID *is* its client ID and the provider validates it by
-     * resolving the RP's own Trust Chain. That needs this deployment published
-     * as a federation entity and enrolled under the Trust Anchor, so until then
-     * a provider has to be told about us the ordinary way.
+     * These are a legacy fallback for providers that do not support automatic
+     * registration. A configured federation RP instead uses its entity ID as
+     * its client ID and proves its registration through its Trust Chain.
      *
      * @return ?array{client_id: string, client_secret: string, scopes?: string[]}
      */
@@ -346,6 +367,98 @@ class ModuleConfig
 
 
     /**
+     * Entity Identifier published by this module when it acts as a federation
+     * leaf (the RP) or as the local Trust Anchor.
+     */
+    public function getFederationEntityId(): ?string
+    {
+        $entityId = $this->config->getOptionalString(self::OPTION_FEDERATION_ENTITY_ID, null);
+
+        return ($entityId === null || $entityId === '') ? null : rtrim($entityId, '/');
+    }
+
+
+    public function getFederationEntityRole(): ?string
+    {
+        $role = $this->config->getOptionalString(self::OPTION_FEDERATION_ENTITY_ROLE, null);
+
+        return in_array($role, [self::FEDERATION_ROLE_RELYING_PARTY, self::FEDERATION_ROLE_TRUST_ANCHOR], true)
+            ? $role
+            : null;
+    }
+
+
+    public function isFederationRelyingParty(): bool
+    {
+        return $this->getFederationEntityId() !== null
+            && $this->getFederationEntityRole() === self::FEDERATION_ROLE_RELYING_PARTY;
+    }
+
+
+    public function isFederationTrustAnchor(): bool
+    {
+        return $this->getFederationEntityId() !== null
+            && $this->getFederationEntityRole() === self::FEDERATION_ROLE_TRUST_ANCHOR;
+    }
+
+
+    /**
+     * @return string[]
+     */
+    public function getFederationAuthorityHints(): array
+    {
+        return $this->stringList(self::OPTION_FEDERATION_AUTHORITY_HINTS);
+    }
+
+
+    /**
+     * The explicit enrollment allow-list used by the local Trust Anchor.
+     *
+     * @return string[]
+     */
+    public function getFederationSubordinates(): array
+    {
+        return $this->stringList(self::OPTION_FEDERATION_SUBORDINATES);
+    }
+
+
+    public function getFederationPrivateKey(): ?string
+    {
+        return $this->nonEmptyString(self::OPTION_FEDERATION_PRIVATE_KEY);
+    }
+
+
+    public function getProtocolPrivateKey(): ?string
+    {
+        return $this->nonEmptyString(self::OPTION_PROTOCOL_PRIVATE_KEY);
+    }
+
+
+    /**
+     * @return string[]
+     */
+    public function getFederationRedirectUris(): array
+    {
+        return $this->stringList(self::OPTION_FEDERATION_REDIRECT_URIS);
+    }
+
+
+    public function getFederationDisplayName(): string
+    {
+        return $this->config->getOptionalString(
+            self::OPTION_FEDERATION_DISPLAY_NAME,
+            'SimpleSAMLphp embedded discovery',
+        );
+    }
+
+
+    public function getFederationStatementTtl(): int
+    {
+        return max(60, $this->config->getOptionalInteger(self::OPTION_FEDERATION_STATEMENT_TTL, 86400));
+    }
+
+
+    /**
      * Scopes to ask for, unless the client entry overrides them.
      *
      * @return non-empty-array<int, string>
@@ -361,6 +474,26 @@ class ModuleConfig
         $result = $scopes === [] ? ['openid'] : $scopes;
 
         return $result;
+    }
+
+
+    /**
+     * @return string[]
+     */
+    protected function stringList(string $option): array
+    {
+        return array_values(array_filter(
+            $this->config->getOptionalArray($option, []),
+            static fn(mixed $value): bool => is_string($value) && $value !== '',
+        ));
+    }
+
+
+    protected function nonEmptyString(string $option): ?string
+    {
+        $value = $this->config->getOptionalString($option, null);
+
+        return ($value === null || $value === '') ? null : $value;
     }
 
 

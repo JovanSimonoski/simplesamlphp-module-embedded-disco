@@ -3,10 +3,11 @@
 # Then browse to https://localhost:8443/simplesaml/ (self-signed cert warning is
 # expected -- the base image ships a development certificate).
 #
-# Three services:
+# Four services:
 #   ssp  the relying party, with this module -- the discovery picker
-#   op   the first local OpenID Provider and the demo Trust Anchor
-#   op2  a second local OpenID Provider enrolled beneath op
+#   ta   a dedicated OpenID Federation Trust Anchor
+#   op   the first local OpenID Provider enrolled beneath ta
+#   op2  the second local OpenID Provider enrolled beneath ta
 #
 # The OP needs a certificate first:  bash docker/op/make-certs.sh
 services:
@@ -18,6 +19,13 @@ services:
         SSP_VERSION: "${SSP_VERSION:-v2.5.0}"
         EMBEDDED_DISCO_VERSION: "${EMBEDDED_DISCO_VERSION:-@dev}"
     hostname: ssp.local
+    depends_on:
+      ta:
+        condition: service_healthy
+      op:
+        condition: service_healthy
+      op2:
+        condition: service_healthy
     ports:
       - "8443:443"
     environment:
@@ -28,29 +36,74 @@ services:
       - SSP_ENABLED_MODULES=exampleauth embeddeddisco
       - SSP_LOG_LEVEL=7
       - SSP_SECRET_SALT=testsalt
+      - EMBEDDED_DISCO_ENTITY_ROLE=openid_relying_party
+      - APACHE_CERT_NAME=op-demo
+      - SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+      - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
     volumes:
       # Live-edit the module without rebuilding.
       - ../:/var/simplesamlphp/staging-modules/embeddeddisco
       - ./ssp/authsources.php:/var/simplesamlphp/config/authsources.php:ro
       - ./ssp/config-override.php:/var/simplesamlphp/config/config-override.php:ro
       - ../config-templates/module_embeddeddisco.php:/var/simplesamlphp/config/module_embeddeddisco.php:ro
-      # The OP's certificate, so the relying party can verify it when it fetches
-      # metadata and exchanges the authorization code (http_ca_bundle).
-      - ./op/tls/op.crt:/var/simplesamlphp/cert/op-ca.crt:ro
+      - ./entity/run-on-start.sh:/opt/simplesaml/run-on-start.sh:ro
+      - rp-cert:/var/simplesamlphp/cert
+      - ./op/tls/op.crt:/usr/local/share/ca-certificates/local-federation-ca.crt:ro
+      - ./op/tls/op.crt:/etc/ssl/certs/op-demo.pem:ro
+      - ./op/tls/op.key:/etc/ssl/private/op-demo.key:ro
+
+  # A dedicated authority: it publishes its own signed Entity Configuration,
+  # lists the three enrolled leaves, and signs subordinate statements for them.
+  ta:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        SSP_VERSION: "${SSP_VERSION:-v2.5.0}"
+        EMBEDDED_DISCO_VERSION: "${EMBEDDED_DISCO_VERSION:-@dev}"
+    hostname: ta.local
+    ports:
+      - "8446:443"
+    environment:
+      - STAGINGCOMPOSERREPOS=embeddeddisco
+      - SSP_ADMIN_PASSWORD=secret1
+      - SSP_ENABLED_MODULES=embeddeddisco
+      - SSP_LOG_LEVEL=7
+      - SSP_SECRET_SALT=tatestsalt
+      - EMBEDDED_DISCO_ENTITY_ROLE=trust_anchor
+      - APACHE_CERT_NAME=op-demo
+      - SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+      - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+    volumes:
+      - ../:/var/simplesamlphp/staging-modules/embeddeddisco
+      - ./ta/authsources.php:/var/simplesamlphp/config/authsources.php:ro
+      - ./ta/config-override.php:/var/simplesamlphp/config/config-override.php:ro
+      - ./ta/module_embeddeddisco.php:/var/simplesamlphp/config/module_embeddeddisco.php:ro
+      - ./entity/run-on-start.sh:/opt/simplesaml/run-on-start.sh:ro
+      - ta-cert:/var/simplesamlphp/cert
+      - ./op/tls/op.crt:/usr/local/share/ca-certificates/local-federation-ca.crt:ro
+      - ./op/tls/op.crt:/etc/ssl/certs/op-demo.pem:ro
+      - ./op/tls/op.key:/etc/ssl/private/op-demo.key:ro
+    healthcheck:
+      test: ["CMD", "curl", "-kf", "https://localhost/simplesaml/module.php/embeddeddisco/federation/.well-known/openid-federation"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   # Local OpenID Provider: stock SimpleSAMLphp plus simplesamlphp-module-oidc,
-  # the same stack GEANT's demo OP runs, so it speaks OpenID Federation and can
-  # later accept the relying party through automatic registration.
+  # the same stack GEANT's demo OP runs. It accepts the relying party through
+  # OpenID Federation automatic registration.
   op:
     image: "cirrusid/simplesamlphp:${SSP_VERSION:-v2.5.0}"
     hostname: op.local
     depends_on:
-      op2:
+      ta:
         condition: service_healthy
     ports:
       - "8444:443"
     environment:
-      - COMPOSER_REQUIRE=simplesamlphp/simplesamlphp-module-oidc
+      - COMPOSER_REQUIRE=simplesamlphp/simplesamlphp-module-oidc:6.4.5
       - SSP_ADMIN_PASSWORD=secret1
       - SSP_ENABLED_MODULES=exampleauth oidc
       - SSP_LOG_LEVEL=7
@@ -59,36 +112,45 @@ services:
       - OP_ISSUER=https://host.docker.internal:8444/simplesaml/module.php/oidc
       - OP_COOKIE_NAME=OPSSPSID
       - OP_DISPLAY_NAME=Local OpenID Provider 1
-      - OP_SUBORDINATE_ID=https://host.docker.internal:8445/simplesaml/module.php/oidc
+      - OP_AUTHORITY_HINT=https://host.docker.internal:8446/simplesaml/module.php/embeddeddisco/federation
+      - OP_TRUST_ANCHOR=https://host.docker.internal:8446/simplesaml/module.php/embeddeddisco/federation
       # The image picks its TLS certificate by name; ours is valid for
       # host.docker.internal, which the image's own certificate is not (and it
       # expired in June 2026 besides).
       - APACHE_CERT_NAME=op-demo
-      # Read by the client registration script in run-on-start.sh.
-      - OP_CLIENT_ID=embedded-disco-rp
-      - OP_CLIENT_SECRET=embedded-disco-secret
-      - OP_CLIENT_REDIRECT_URI=https://localhost:8443/simplesaml/module.php/embeddeddisco/callback
+      - SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+      - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
     volumes:
       - ./op/ssp/authsources.php:/var/simplesamlphp/config/authsources.php:ro
       - ./op/ssp/config-override.php:/var/simplesamlphp/config/config-override.php:ro
       - ./op/ssp/module_oidc.php:/var/simplesamlphp/config/module_oidc.php:ro
       - ./op/run-on-start.sh:/opt/simplesaml/run-on-start.sh:ro
-      - ./op/register-client.php:/opt/simplesaml/register-client.php:ro
-      - ./op/enroll-subordinate.php:/opt/simplesaml/enroll-subordinate.php:ro
+      - op-cert:/var/simplesamlphp/cert
+      - op-data:/var/simplesamlphp/data
       # Serves the name the RP and the browser both use.
       - ./op/tls/op.crt:/etc/ssl/certs/op-demo.pem:ro
       - ./op/tls/op.key:/etc/ssl/private/op-demo.key:ro
+      - ./op/tls/op.crt:/usr/local/share/ca-certificates/local-federation-ca.crt:ro
+    healthcheck:
+      test: ["CMD", "curl", "-kf", "https://localhost/simplesaml/module.php/oidc/.well-known/openid-federation"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   # Second provider. It uses the same container definition and development TLS
   # certificate as OP1, but has its own issuer, signing keys, database and
-  # session cookie. OP1 enrolls it as a federation subordinate during startup.
+  # session cookie. The dedicated Trust Anchor enrolls both providers.
   op2:
     image: "cirrusid/simplesamlphp:${SSP_VERSION:-v2.5.0}"
     hostname: op2.local
+    depends_on:
+      ta:
+        condition: service_healthy
     ports:
       - "8445:443"
     environment:
-      - COMPOSER_REQUIRE=simplesamlphp/simplesamlphp-module-oidc
+      - COMPOSER_REQUIRE=simplesamlphp/simplesamlphp-module-oidc:6.4.5
       - SSP_ADMIN_PASSWORD=secret1
       - SSP_ENABLED_MODULES=exampleauth oidc
       - SSP_LOG_LEVEL=7
@@ -98,22 +160,31 @@ services:
       - OP_ISSUER=https://host.docker.internal:8445/simplesaml/module.php/oidc
       - OP_COOKIE_NAME=OP2SSPSID
       - OP_DISPLAY_NAME=Local OpenID Provider 2
-      - OP_AUTHORITY_HINT=https://host.docker.internal:8444/simplesaml/module.php/oidc
-      - OP_CLIENT_ID=embedded-disco-rp
-      - OP_CLIENT_SECRET=embedded-disco-secret
-      - OP_CLIENT_REDIRECT_URI=https://localhost:8443/simplesaml/module.php/embeddeddisco/callback
+      - OP_AUTHORITY_HINT=https://host.docker.internal:8446/simplesaml/module.php/embeddeddisco/federation
+      - OP_TRUST_ANCHOR=https://host.docker.internal:8446/simplesaml/module.php/embeddeddisco/federation
+      - SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+      - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
     volumes:
       - ./op/ssp/authsources.php:/var/simplesamlphp/config/authsources.php:ro
       - ./op/ssp/config-override.php:/var/simplesamlphp/config/config-override.php:ro
       - ./op/ssp/module_oidc.php:/var/simplesamlphp/config/module_oidc.php:ro
       - ./op/run-on-start.sh:/opt/simplesaml/run-on-start.sh:ro
-      - ./op/register-client.php:/opt/simplesaml/register-client.php:ro
-      - ./op/enroll-subordinate.php:/opt/simplesaml/enroll-subordinate.php:ro
+      - op2-cert:/var/simplesamlphp/cert
+      - op2-data:/var/simplesamlphp/data
       - ./op/tls/op.crt:/etc/ssl/certs/op-demo.pem:ro
       - ./op/tls/op.key:/etc/ssl/private/op-demo.key:ro
+      - ./op/tls/op.crt:/usr/local/share/ca-certificates/local-federation-ca.crt:ro
     healthcheck:
       test: ["CMD", "curl", "-kf", "https://localhost/simplesaml/module.php/oidc/.well-known/openid-federation"]
       interval: 5s
       timeout: 5s
       retries: 12
       start_period: 30s
+
+volumes:
+  rp-cert:
+  ta-cert:
+  op-cert:
+  op-data:
+  op2-cert:
+  op2-data:

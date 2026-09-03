@@ -8,6 +8,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\RequestOptions;
 use SimpleSAML\Module;
 use SimpleSAML\Module\embeddeddisco\Federation\ErrorDetail;
+use SimpleSAML\Module\embeddeddisco\Federation\LocalEntityService;
 use SimpleSAML\Module\embeddeddisco\Federation\SelectionVerification;
 use SimpleSAML\Module\embeddeddisco\ModuleConfig;
 use SimpleSAML\OpenID\Codebooks\ClaimsEnum;
@@ -49,6 +50,8 @@ class RelyingPartyService
 
     protected ?Core $core = null;
 
+    protected ?LocalEntityService $localEntityService = null;
+
 
     public function __construct(
         protected readonly ModuleConfig $moduleConfig,
@@ -63,7 +66,8 @@ class RelyingPartyService
     {
         return $this->issuerOf($selectionVerification) !== null
             && $this->authorizationEndpointOf($selectionVerification) !== null
-            && $this->moduleConfig->getClientForIssuer((string) $this->issuerOf($selectionVerification)) !== null;
+            && ($this->moduleConfig->isFederationRelyingParty()
+                || $this->moduleConfig->getClientForIssuer((string) $this->issuerOf($selectionVerification)) !== null);
     }
 
 
@@ -89,19 +93,25 @@ class RelyingPartyService
         $authorizationEndpoint = $this->authorizationEndpointOf($selectionVerification)
             ?? throw new RelyingPartyException('The resolved metadata has no authorization endpoint.');
 
-        $client = $this->moduleConfig->getClientForIssuer($issuer)
-            ?? throw new RelyingPartyException(
-                'No client is registered for this provider, so a login cannot be started. Add one under the ' .
-                '"clients" option, keyed by the issuer.',
-            );
+        if ($this->moduleConfig->isFederationRelyingParty()) {
+            $clientId = (string) $this->moduleConfig->getFederationEntityId();
+            $scopes = $this->moduleConfig->getScopes();
+        } else {
+            $client = $this->moduleConfig->getClientForIssuer($issuer)
+                ?? throw new RelyingPartyException(
+                    'No client is registered for this provider, so a login cannot be started. Add one under the ' .
+                    '"clients" option, keyed by the issuer.',
+                );
 
-        /** @var string[] $scopes */
-        $scopes = $client['scopes'] ?? $this->moduleConfig->getScopes();
+            $clientId = $client['client_id'];
+            /** @var string[] $scopes */
+            $scopes = $client['scopes'] ?? $this->moduleConfig->getScopes();
+        }
 
         return new AuthorizationRequest(
             issuer: $issuer,
             authorizationEndpoint: $authorizationEndpoint,
-            clientId: $client['client_id'],
+            clientId: $clientId,
             redirectUri: Module::getModuleURL(self::ROUTE_CALLBACK),
             scopes: $scopes,
             nonce: $this->randomString(),
@@ -127,6 +137,29 @@ class RelyingPartyService
             'code_challenge_method' => 'S256',
         ];
 
+        if ($this->isFederationClient($authorizationRequest->clientId)) {
+            try {
+                $requestObject = $this->localEntityService()->requestObject(
+                    $authorizationRequest->issuer,
+                    $parameters,
+                );
+            } catch (Throwable $throwable) {
+                throw new RelyingPartyException(
+                    'Could not sign the automatic-registration request: ' .
+                    ErrorDetail::shorten($throwable->getMessage()),
+                    previous: $throwable,
+                );
+            }
+
+            // Keep only the client identifier outside the signed Request Object.
+            // The provider obtains every security-sensitive authorization
+            // parameter from the verified JWT.
+            $parameters = [
+                'client_id' => $authorizationRequest->clientId,
+                'request' => $requestObject,
+            ];
+        }
+
         $endpoint = $authorizationRequest->authorizationEndpoint;
 
         return $endpoint . (str_contains($endpoint, '?') ? '&' : '?') . http_build_query($parameters);
@@ -144,23 +177,25 @@ class RelyingPartyService
     {
         $issuer = (string) ($pending['issuer'] ?? '');
         $clientId = (string) ($pending['clientId'] ?? '');
-        $client = $this->moduleConfig->getClientForIssuer($issuer)
-            ?? throw new RelyingPartyException('No client is registered for this provider any more.');
 
         $tokenEndpoint = $this->claim($selectionVerification, ClaimsEnum::TokenEndpoint->value)
             ?? throw new RelyingPartyException('The resolved metadata has no token endpoint.');
 
-        $response = $this->postForm($tokenEndpoint, [
+        $form = [
             'grant_type' => 'authorization_code',
             'code' => $code,
             'redirect_uri' => (string) ($pending['redirectUri'] ?? ''),
             'client_id' => $clientId,
-            // This provider advertises client_secret_post. A federation-native
-            // deployment would send a private_key_jwt client assertion instead,
-            // and hold no shared secret at all.
-            'client_secret' => $client['client_secret'],
             'code_verifier' => (string) ($pending['codeVerifier'] ?? ''),
-        ]);
+        ];
+
+        if (!$this->isFederationClient($clientId)) {
+            $client = $this->moduleConfig->getClientForIssuer($issuer)
+                ?? throw new RelyingPartyException('No client is registered for this provider any more.');
+            $form['client_secret'] = $client['client_secret'];
+        }
+
+        $response = $this->postForm($tokenEndpoint, $form);
 
         $idToken = $response['id_token'] ?? null;
 
@@ -308,6 +343,20 @@ class RelyingPartyService
     protected function core(): Core
     {
         return $this->core ??= new Core();
+    }
+
+
+    protected function localEntityService(): LocalEntityService
+    {
+        return $this->localEntityService ??= new LocalEntityService($this->moduleConfig);
+    }
+
+
+    protected function isFederationClient(string $clientId): bool
+    {
+        return $this->moduleConfig->isFederationRelyingParty()
+            && $clientId !== ''
+            && $clientId === $this->moduleConfig->getFederationEntityId();
     }
 
 

@@ -11,10 +11,8 @@ $config = [
     // <trust_anchor_id>/.well-known/openid-federation, and that document is the
     // entry point for everything the module does.
     //
-    // The default is the first OpenID Provider container that ships with this
-    // module. It acts as the Trust Anchor and enrolls the second local provider
-    // beneath it. Both providers know about this relying party, so either path
-    // can complete a login locally.
+    // The Docker setup has a dedicated Trust Anchor. Both providers and this RP
+    // are independently enrolled beneath it.
     //
     // For discovery across a real multi-level federation, point this at one of
     // the fed.oidfed.com demo topologies instead:
@@ -24,8 +22,8 @@ $config = [
     //                                    intermediate in the middle
     //   https://ta.single.fed.oidfed.com flat: providers directly under the anchor
     //
-    // Those providers verify but cannot be logged in to, because this deployment
-    // is not a member of their federation -- see the clients option below.
+    // Those providers verify but cannot be logged in to, because this local RP
+    // is enrolled only beneath the Docker federation's Trust Anchor.
     //
     // The project's own target federation is the GEANT Trust and Identity
     // Incubator testbed:
@@ -39,7 +37,8 @@ $config = [
     // resolve. Its own resolve endpoint answers "no valid trust path between sub
     // and anchor found" for its own subordinate. Switch back to it once that is
     // fixed; nothing else here has to change.
-    ModuleConfig::OPTION_TRUST_ANCHOR_ID => 'https://host.docker.internal:8444/simplesaml/module.php/oidc',
+    ModuleConfig::OPTION_TRUST_ANCHOR_ID =>
+        'https://host.docker.internal:8446/simplesaml/module.php/embeddeddisco/federation',
 
     // Entity types offered in the picker. An RP discovering where to send the
     // user wants OPs, so that is the default.
@@ -117,28 +116,29 @@ $config = [
     // loudly, it makes that part of the federation unreadable.
     ModuleConfig::OPTION_SIGNATURE_ALGORITHMS => null,
 
-    // Client credentials this relying party holds at a provider, keyed by that
-    // provider's issuer. A provider with no entry here can be discovered and
-    // verified, but not logged in to -- the selection page says so rather than
-    // sending anyone anywhere.
-    //
-    // OpenID Federation's own answer is automatic registration: the RP's entity
-    // ID is its client ID, and the provider validates it by resolving the RP's
-    // Trust Chain, so no shared secret exists. That needs this deployment
-    // published as a federation entity and enrolled under the Trust Anchor,
-    // which is the next step for this module.
-    ModuleConfig::OPTION_CLIENTS => [
-        'https://host.docker.internal:8444/simplesaml/module.php/oidc' => [
-            'client_id' => 'embedded-disco-rp',
-            'client_secret' => 'embedded-disco-secret',
-            'scopes' => ['openid'],
-        ],
-        'https://host.docker.internal:8445/simplesaml/module.php/oidc' => [
-            'client_id' => 'embedded-disco-rp',
-            'client_secret' => 'embedded-disco-secret',
-            'scopes' => ['openid'],
-        ],
+    // This RP is itself a federation entity. Its Entity Identifier is also its
+    // client_id. Providers resolve this signed metadata and its Trust Chain when
+    // they receive the signed Request Object, so there is no per-provider client
+    // registration and no shared client secret.
+    ModuleConfig::OPTION_FEDERATION_ENTITY_ID =>
+        'https://host.docker.internal:8443/simplesaml/module.php/embeddeddisco/federation',
+    ModuleConfig::OPTION_FEDERATION_ENTITY_ROLE => ModuleConfig::FEDERATION_ROLE_RELYING_PARTY,
+    ModuleConfig::OPTION_FEDERATION_AUTHORITY_HINTS => [
+        'https://host.docker.internal:8446/simplesaml/module.php/embeddeddisco/federation',
     ],
+    ModuleConfig::OPTION_FEDERATION_PRIVATE_KEY =>
+        '/var/simplesamlphp/cert/embeddeddisco_federation.key',
+    ModuleConfig::OPTION_PROTOCOL_PRIVATE_KEY =>
+        '/var/simplesamlphp/cert/embeddeddisco_protocol.key',
+    ModuleConfig::OPTION_FEDERATION_REDIRECT_URIS => [
+        'https://localhost:8443/simplesaml/module.php/embeddeddisco/callback',
+    ],
+    ModuleConfig::OPTION_FEDERATION_DISPLAY_NAME => 'Local SimpleSAMLphp RP',
+    ModuleConfig::OPTION_FEDERATION_STATEMENT_TTL => 86400,
+
+    // Kept as a backwards-compatible fallback for deployments that have not
+    // made the RP a federation entity. The Docker federation does not use it.
+    ModuleConfig::OPTION_CLIENTS => [],
 
     // Scopes to ask for, unless a client entry above overrides them.
     ModuleConfig::OPTION_SCOPES => ['openid'],
@@ -148,9 +148,9 @@ $config = [
     // know. This adds a trusted CA; it never disables verification. Null uses
     // the system trust store.
     //
-    // The demo OP container serves a self-signed certificate, mounted here by
-    // docker-compose.
-    ModuleConfig::OPTION_HTTP_CA_BUNDLE => '/var/simplesamlphp/cert/op-ca.crt',
+    // Every local entity serves the same development certificate. It is mounted
+    // here as the private federation's TLS trust root.
+    ModuleConfig::OPTION_HTTP_CA_BUNDLE => '/usr/local/share/ca-certificates/local-federation-ca.crt',
 
     // PSR-16 cache directory. Null uses SimpleSAMLphp's cachedir.
     ModuleConfig::OPTION_CACHE_DIRECTORY => null,

@@ -55,16 +55,14 @@ federated discovery without knowing about it:
 The bundled fixture is still there behind `use_mock_data`, for demoing offline
 and for the tests. It is off by default.
 
-### What still uses a shared secret
+### Federation-native registration
 
-The one part that is not yet federation-native is how this relying party
-identifies itself to a provider. OpenID Federation's answer is **automatic
-registration**: the RP's entity ID *is* its client ID, and the provider validates
-it by fetching the RP's own Entity Configuration and resolving *its* Trust Chain
-— no client secret exists anywhere. That requires this deployment to be published
-as a federation entity at a URL the provider can reach, and enrolled under the
-Trust Anchor. Until then a provider has to be told about us the ordinary way, via
-the `clients` option.
+The local Docker relying party is a full federation entity. It publishes a
+self-signed Entity Configuration, is enrolled beneath the local Trust Anchor,
+and signs its authorization Request Objects. Each OP resolves the RP's Trust
+Chain and registers it automatically: the RP entity ID is the client ID and no
+shared client secret is configured. The `clients` option remains available only
+as a backwards-compatible fallback for non-federation providers.
 
 This is also why the public demo providers cannot be logged in to. Asked to
 start a login, `https://op-uni.hier.fed.oidfed.com` answers:
@@ -128,6 +126,18 @@ Nothing in the module is specific to either; the Trust Anchor is one config line
 | `validate_trust_marks` | `true` | Validate that entity's Trust Marks |
 | `expose_error_details` | `true` | Show technical failure reasons in the UI |
 | `signature_algorithms` | all but `none` | Algorithms an entity statement may be signed with |
+| `federation_entity_id` | `null` | This RP or authority's public Entity Identifier |
+| `federation_entity_role` | `null` | `openid_relying_party` or `trust_anchor` |
+| `federation_authority_hints` | `[]` | Immediate superiors advertised by a leaf entity |
+| `federation_subordinates` | `[]` | Explicit enrollment allow-list for a local Trust Anchor |
+| `federation_private_key` | `null` | PEM key used to sign Entity Statements |
+| `protocol_private_key` | `null` | Separate RP key used to sign authorization Request Objects |
+| `federation_redirect_uris` | `[]` | Callback URLs published in RP metadata |
+| `federation_display_name` | module name | Name published in federation metadata |
+| `federation_statement_ttl` | `86400` | Entity and subordinate statement lifetime in seconds |
+| `clients` | `[]` | Legacy per-provider credentials when federation registration is unavailable |
+| `scopes` | `['openid']` | OIDC scopes requested by the RP |
+| `http_ca_bundle` | `null` | Extra CA bundle for private HTTPS endpoints |
 | `cache_directory` | SSP `cachedir` | PSR-16 cache location |
 | `cache_duration` | `3600` | Cache lifetime, in seconds |
 
@@ -342,15 +352,9 @@ cached, so it is a few hundred milliseconds cold and free afterwards.
 
 ## Development environment
 
-Two ways to run it, both installing this module from the working copy so edits on
-the host take effect without rebuilding. Run either from the repository root.
-The container needs outbound HTTPS, since discovery is real.
-
-### Option A — plain `docker run` (no build)
-
-Pulls the stock SimpleSAMLphp image and installs the module with composer on
-every container start (~40s). Nothing to rebuild when `composer.json` changes.
-Use the wrapper scripts, which also remove any previous container:
+The Docker Compose environment is a complete, local OpenID Federation. It mounts
+this module from the working copy, so PHP and template edits take effect without
+an image rebuild. Run either wrapper from the repository root:
 
 ```powershell
 .\docker\run.ps1
@@ -360,28 +364,35 @@ Use the wrapper scripts, which also remove any previous container:
 ./docker/run.sh
 ```
 
-Stop and remove with `docker rm -f ssp-embedded-disco`; follow logs with
-`docker logs -f ssp-embedded-disco`.
-
-### Option B — Docker Compose (build cached)
-
-Bakes the composer install into an image layer, so restarts are fast.
+Or invoke Compose directly:
 
 ```bash
 docker compose -f docker/docker-compose.yml up --build -d
 ```
 
-Rebuild only when `composer.json` changes; otherwise `up -d` is enough. Follow
-logs with `docker compose -f docker/docker-compose.yml logs -f ssp`.
+The first build can take a few minutes. Later starts are cached; `up -d` is enough
+unless dependencies changed. Follow logs with
+`docker compose -f docker/docker-compose.yml logs -f` and stop everything with
+`docker compose -f docker/docker-compose.yml down`.
 
-### The local OpenID Providers
+### Local federation topology
 
-`docker compose` brings up three services: `ssp`, the relying party with this
-module, and two SimpleSAMLphp providers, `op` and `op2`, running
-`simplesamlphp-module-oidc` — the same stack GÉANT's demo provider runs. Both
-publish their own Entity Configuration.
+Compose brings up four services:
 
-Generate its certificate once before the first start:
+```text
+                         dedicated Trust Anchor (:8446)
+                           /          |          \
+                          /           |           \
+                 OP 1 (:8444)   OP 2 (:8445)   RP (:8443)
+```
+
+The Trust Anchor is a separate authority and explicitly enrolls all three leaf
+entities. Both OPs run `simplesamlphp-module-oidc`; the RP and Trust Anchor use
+this module to publish their federation endpoints and signed Entity
+Configurations. Discovery therefore returns the two OPs, while RP automatic
+registration resolves independently through the same anchor.
+
+Generate the local development TLS certificate if it is not already present:
 
 ```bash
 bash docker/op/make-certs.sh
@@ -392,29 +403,32 @@ The certificate names `host.docker.internal`, which resolves both from the host
 browser and from inside the relying party container. That matters more than it
 sounds: the issuer in an ID token has to be the same string the RP fetched the
 provider's metadata from, so both sides need one URL that means the same thing.
-The relying party trusts that certificate through `http_ca_bundle`, which adds a
-CA rather than turning verification off.
+Every container installs that certificate into its local trust store. TLS
+verification remains enabled.
 
-On start each OP generates independent signing keys, runs its database
-migrations against SQLite, and registers this relying party as a client. OP1
-also enrolls OP2's federation keys, so its federation list and fetch endpoints
-form a valid Trust Chain from OP2 to OP1. See `docker/op/run-on-start.sh`, which
-the image runs before Apache, and `docker/op/enroll-subordinate.php`.
+On first start, the RP, Trust Anchor, and both OPs generate independent signing
+keys. Each OP also initializes its own SQLite database. Keys and provider data
+live in named Docker volumes, so ordinary rebuilds and restarts preserve entity
+identity and automatic registrations. `docker compose -f docker/docker-compose.yml down -v`
+removes those volumes and creates a fresh federation on the next start.
 
 | What | Where |
 | --- | --- |
-| OP1 issuer / Trust Anchor | `https://host.docker.internal:8444/simplesaml/module.php/oidc` |
+| Trust Anchor entity | `https://host.docker.internal:8446/simplesaml/module.php/embeddeddisco/federation` |
+| Trust Anchor configuration | <https://host.docker.internal:8446/simplesaml/module.php/embeddeddisco/federation/.well-known/openid-federation> |
+| Trust Anchor subordinate list | <https://host.docker.internal:8446/simplesaml/module.php/embeddeddisco/federation/list> |
+| OP1 issuer | `https://host.docker.internal:8444/simplesaml/module.php/oidc` |
 | OP2 issuer | `https://host.docker.internal:8445/simplesaml/module.php/oidc` |
-| Entity Configurations | Append `/.well-known/openid-federation` to either issuer |
+| RP entity | `https://host.docker.internal:8443/simplesaml/module.php/embeddeddisco/federation` |
+| Leaf Entity Configurations | Append `/.well-known/openid-federation` to the entity ID |
 | OP1 admin | <https://host.docker.internal:8444/simplesaml/> — `admin` / `secret1` |
 | OP2 admin | <https://host.docker.internal:8445/simplesaml/> — `admin` / `secret1` |
 | Test users | `student` / `studentpass`, `staff` / `staffpass` |
 
-By default `trust_anchor_id` points at OP1. Discovery returns OP1 itself and OP2,
-which OP1 enrolls as its subordinate. This keeps the default setup fully local
-while exercising both direct Trust Anchor selection and a two-entity Trust
-Chain. Point it at `https://ta.hier.fed.oidfed.com` instead to show discovery
-across a real multi-level federation.
+The mounted Docker configuration points `trust_anchor_id` at the dedicated local
+anchor. Every leaf therefore resolves as `leaf → Trust Anchor`. Point it at
+`https://ta.hier.fed.oidfed.com` instead to inspect discovery across a public,
+multi-level federation; its OPs will not accept this locally enrolled RP.
 
 ### Trying the login
 
@@ -426,10 +440,7 @@ the Trust Chain and redirects to the provider, and you authenticate there as
 `student`. After the provider redirects back, the RP displays the resulting
 session attributes and technical authentication data.
 
-### Either way
-
-Browse to <https://localhost:8443/simplesaml/>. The base image ships a
-self-signed development certificate, so expect a browser warning.
+The local certificate is self-signed, so expect a browser warning.
 
 | What | Where |
 | --- | --- |
@@ -445,11 +456,15 @@ which federation endpoints it advertises.
 
 ### Layout
 
-* `docker/run.sh`, `docker/run.ps1` — option A wrappers (no build).
+* `docker/run.sh`, `docker/run.ps1` — wrappers for the Compose environment.
 * `docker/Dockerfile` — SSP base image plus this module, installed via a composer
   path repository at `/var/simplesamlphp/staging-modules/embeddeddisco`.
-* `docker/docker-compose.yml` — the `ssp`, `op`, and `op2` services on host
-  ports `8443`, `8444`, and `8445`.
+* `docker/docker-compose.yml` — the RP, Trust Anchor, and two OP services on
+  host ports `8443`, `8446`, `8444`, and `8445` respectively.
+* `docker/entity/run-on-start.sh` — creates persistent RP/TA signing keys and
+  installs the local TLS trust root.
+* `docker/ta/` — the dedicated Trust Anchor's SimpleSAMLphp configuration.
+* `docker/op/` — shared provider configuration and startup initialization.
 * `docker/ssp/config-override.php` — appended to the container's SSP config.
 * `docker/ssp/authsources.php` — example auth sources for testing.
 * `config-templates/module_embeddeddisco.php` — module configuration, mounted
@@ -486,12 +501,6 @@ Against `ta.hier`, discovery finds 7 entities (2 of them OPs), and selecting
 
 ## Not done yet
 
-* **Automatic client registration.** The login works, but this relying party
-  identifies itself with a client ID and secret configured per provider. The
-  federation-native way is for the RP to publish its own Entity Configuration and
-  be enrolled under the Trust Anchor, after which its entity ID is its client ID
-  and no secret exists. That is the remaining step to being a full federation
-  member rather than a well-informed outsider.
 * **Trust Mark validation against real marks.** The code path is there and runs,
   but no entity in any reachable demo federation publishes a `trust_marks` claim,
   so it has only been exercised against the fixture's unsigned types.

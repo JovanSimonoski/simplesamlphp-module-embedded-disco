@@ -48,3 +48,24 @@ embeddeddisco-status:
     _controller: 'SimpleSAML\Module\embeddeddisco\Controller\Status::status'
   }
   methods: [GET]
+
+embeddeddisco-federation-configuration:
+  path: /federation/.well-known/openid-federation
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\FederationEntity::configuration'
+  }
+  methods: [GET]
+
+embeddeddisco-federation-list:
+  path: /federation/list
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\FederationEntity::list'
+  }
+  methods: [GET]
+
+embeddeddisco-federation-fetch:
+  path: /federation/fetch
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\FederationEntity::fetch'
+  }
+  methods: [GET]

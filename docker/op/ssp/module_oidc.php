@@ -17,6 +17,7 @@ use SimpleSAML\Module\oidc\ModuleConfig;
 
 $issuer = getenv('OP_ISSUER') ?: 'https://host.docker.internal:8444/simplesaml/module.php/oidc';
 $authorityHint = getenv('OP_AUTHORITY_HINT') ?: '';
+$trustAnchor = getenv('OP_TRUST_ANCHOR') ?: '';
 $displayName = getenv('OP_DISPLAY_NAME') ?: 'Local OpenID Provider';
 
 /*
@@ -361,6 +362,7 @@ $config = [
     // validated by the JWKS acquired during Trust Chain resolution, meaning that security will rely "only"
     // on protection implied from using TLS on endpoints used during Trust Chain resolution.
     ModuleConfig::OPTION_FEDERATION_TRUST_ANCHORS => [
+        ...($trustAnchor === '' ? [] : [$trustAnchor => null]),
         // phpcs:ignore
 //        'https://ta.example.org/' => '{"keys":[{"kty": "RSA","alg": "RS256","use": "sig","kid": "Nzb...9Xs","e": "AQAB","n": "pnXB...ub9J"}]}',
 //        'https://ta2.example.org/' => null,

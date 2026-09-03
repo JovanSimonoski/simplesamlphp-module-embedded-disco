@@ -127,4 +127,70 @@ class ModuleConfigTest extends TestCase
         $this->assertGreaterThan(0, $moduleConfig->getHttpConnectTimeout());
         $this->assertGreaterThan(0, $moduleConfig->getHttpTimeout());
     }
+
+
+    public function testFederationRelyingPartyConfigurationIsTyped(): void
+    {
+        $moduleConfig = $this->moduleConfig([
+            ModuleConfig::OPTION_FEDERATION_ENTITY_ID => 'https://rp.example.org/federation/',
+            ModuleConfig::OPTION_FEDERATION_ENTITY_ROLE => ModuleConfig::FEDERATION_ROLE_RELYING_PARTY,
+            ModuleConfig::OPTION_FEDERATION_AUTHORITY_HINTS => [
+                'https://ta.example.org',
+                '',
+                42,
+            ],
+            ModuleConfig::OPTION_FEDERATION_REDIRECT_URIS => [
+                'https://rp.example.org/callback',
+                null,
+            ],
+            ModuleConfig::OPTION_FEDERATION_PRIVATE_KEY => '/keys/federation.pem',
+            ModuleConfig::OPTION_PROTOCOL_PRIVATE_KEY => '/keys/protocol.pem',
+            ModuleConfig::OPTION_FEDERATION_DISPLAY_NAME => 'Example RP',
+            ModuleConfig::OPTION_FEDERATION_STATEMENT_TTL => 30,
+        ]);
+
+        $this->assertTrue($moduleConfig->isFederationRelyingParty());
+        $this->assertFalse($moduleConfig->isFederationTrustAnchor());
+        $this->assertSame('https://rp.example.org/federation', $moduleConfig->getFederationEntityId());
+        $this->assertSame(['https://ta.example.org'], $moduleConfig->getFederationAuthorityHints());
+        $this->assertSame(['https://rp.example.org/callback'], $moduleConfig->getFederationRedirectUris());
+        $this->assertSame('/keys/federation.pem', $moduleConfig->getFederationPrivateKey());
+        $this->assertSame('/keys/protocol.pem', $moduleConfig->getProtocolPrivateKey());
+        $this->assertSame('Example RP', $moduleConfig->getFederationDisplayName());
+        $this->assertSame(60, $moduleConfig->getFederationStatementTtl());
+    }
+
+
+    public function testFederationTrustAnchorUsesAnExplicitSubordinateAllowList(): void
+    {
+        $moduleConfig = $this->moduleConfig([
+            ModuleConfig::OPTION_FEDERATION_ENTITY_ID => 'https://ta.example.org/federation',
+            ModuleConfig::OPTION_FEDERATION_ENTITY_ROLE => ModuleConfig::FEDERATION_ROLE_TRUST_ANCHOR,
+            ModuleConfig::OPTION_FEDERATION_SUBORDINATES => [
+                'https://op1.example.org',
+                false,
+                'https://op2.example.org',
+            ],
+        ]);
+
+        $this->assertTrue($moduleConfig->isFederationTrustAnchor());
+        $this->assertFalse($moduleConfig->isFederationRelyingParty());
+        $this->assertSame(
+            ['https://op1.example.org', 'https://op2.example.org'],
+            $moduleConfig->getFederationSubordinates(),
+        );
+    }
+
+
+    public function testUnknownFederationRoleDoesNotEnableAnEntity(): void
+    {
+        $moduleConfig = $this->moduleConfig([
+            ModuleConfig::OPTION_FEDERATION_ENTITY_ID => 'https://entity.example.org',
+            ModuleConfig::OPTION_FEDERATION_ENTITY_ROLE => 'unknown',
+        ]);
+
+        $this->assertNull($moduleConfig->getFederationEntityRole());
+        $this->assertFalse($moduleConfig->isFederationRelyingParty());
+        $this->assertFalse($moduleConfig->isFederationTrustAnchor());
+    }
 }
