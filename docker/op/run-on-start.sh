@@ -52,4 +52,13 @@ if [ -n "${OP_CLIENT_ID:-}" ] && [ -f "$DATA_DIR/oidc.sqlite" ]; then
     }
 fi
 
+# OP1 is also the local Trust Anchor. Enroll OP2's federation keys so the OIDC
+# module lists it and can issue the subordinate statement used to verify it.
+if [ -n "${OP_SUBORDINATE_ID:-}" ] && [ -f "$DATA_DIR/oidc.sqlite" ]; then
+    echo "[op] ensuring federation subordinate ${OP_SUBORDINATE_ID} is enrolled"
+    su www-data -s /bin/bash -c "php /opt/simplesaml/enroll-subordinate.php" || {
+        echo "[op] subordinate enrollment failed"
+    }
+fi
+
 echo "[op] ready"

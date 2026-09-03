@@ -11,11 +11,10 @@ $config = [
     // <trust_anchor_id>/.well-known/openid-federation, and that document is the
     // entry point for everything the module does.
     //
-    // The default is the OpenID Provider container that ships with this module,
-    // acting as its own Trust Anchor -- a one-entity federation, which is a
-    // legitimate if degenerate topology. It is the default because it is the one
-    // provider a login can actually be completed against: everything runs
-    // locally, so the provider knows about this relying party.
+    // The default is the first OpenID Provider container that ships with this
+    // module. It acts as the Trust Anchor and enrolls the second local provider
+    // beneath it. Both providers know about this relying party, so either path
+    // can complete a login locally.
     //
     // For discovery across a real multi-level federation, point this at one of
     // the fed.oidfed.com demo topologies instead:
@@ -130,6 +129,11 @@ $config = [
     // which is the next step for this module.
     ModuleConfig::OPTION_CLIENTS => [
         'https://host.docker.internal:8444/simplesaml/module.php/oidc' => [
+            'client_id' => 'embedded-disco-rp',
+            'client_secret' => 'embedded-disco-secret',
+            'scopes' => ['openid'],
+        ],
+        'https://host.docker.internal:8445/simplesaml/module.php/oidc' => [
             'client_id' => 'embedded-disco-rp',
             'client_secret' => 'embedded-disco-secret',
             'scopes' => ['openid'],

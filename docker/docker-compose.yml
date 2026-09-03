@@ -3,9 +3,10 @@
 # Then browse to https://localhost:8443/simplesaml/ (self-signed cert warning is
 # expected -- the base image ships a development certificate).
 #
-# Two services:
+# Three services:
 #   ssp  the relying party, with this module -- the discovery picker
-#   op   a local OpenID Provider to log in against
+#   op   the first local OpenID Provider and the demo Trust Anchor
+#   op2  a second local OpenID Provider enrolled beneath op
 #
 # The OP needs a certificate first:  bash docker/op/make-certs.sh
 services:
@@ -43,6 +44,9 @@ services:
   op:
     image: "cirrusid/simplesamlphp:${SSP_VERSION:-v2.5.0}"
     hostname: op.local
+    depends_on:
+      op2:
+        condition: service_healthy
     ports:
       - "8444:443"
     environment:
@@ -51,6 +55,11 @@ services:
       - SSP_ENABLED_MODULES=exampleauth oidc
       - SSP_LOG_LEVEL=7
       - SSP_SECRET_SALT=optestsalt
+      - OP_BASE_URL=https://host.docker.internal:8444/simplesaml/
+      - OP_ISSUER=https://host.docker.internal:8444/simplesaml/module.php/oidc
+      - OP_COOKIE_NAME=OPSSPSID
+      - OP_DISPLAY_NAME=Local OpenID Provider 1
+      - OP_SUBORDINATE_ID=https://host.docker.internal:8445/simplesaml/module.php/oidc
       # The image picks its TLS certificate by name; ours is valid for
       # host.docker.internal, which the image's own certificate is not (and it
       # expired in June 2026 besides).
@@ -65,6 +74,46 @@ services:
       - ./op/ssp/module_oidc.php:/var/simplesamlphp/config/module_oidc.php:ro
       - ./op/run-on-start.sh:/opt/simplesaml/run-on-start.sh:ro
       - ./op/register-client.php:/opt/simplesaml/register-client.php:ro
+      - ./op/enroll-subordinate.php:/opt/simplesaml/enroll-subordinate.php:ro
       # Serves the name the RP and the browser both use.
       - ./op/tls/op.crt:/etc/ssl/certs/op-demo.pem:ro
       - ./op/tls/op.key:/etc/ssl/private/op-demo.key:ro
+
+  # Second provider. It uses the same container definition and development TLS
+  # certificate as OP1, but has its own issuer, signing keys, database and
+  # session cookie. OP1 enrolls it as a federation subordinate during startup.
+  op2:
+    image: "cirrusid/simplesamlphp:${SSP_VERSION:-v2.5.0}"
+    hostname: op2.local
+    ports:
+      - "8445:443"
+    environment:
+      - COMPOSER_REQUIRE=simplesamlphp/simplesamlphp-module-oidc
+      - SSP_ADMIN_PASSWORD=secret1
+      - SSP_ENABLED_MODULES=exampleauth oidc
+      - SSP_LOG_LEVEL=7
+      - SSP_SECRET_SALT=op2testsalt
+      - APACHE_CERT_NAME=op-demo
+      - OP_BASE_URL=https://host.docker.internal:8445/simplesaml/
+      - OP_ISSUER=https://host.docker.internal:8445/simplesaml/module.php/oidc
+      - OP_COOKIE_NAME=OP2SSPSID
+      - OP_DISPLAY_NAME=Local OpenID Provider 2
+      - OP_AUTHORITY_HINT=https://host.docker.internal:8444/simplesaml/module.php/oidc
+      - OP_CLIENT_ID=embedded-disco-rp
+      - OP_CLIENT_SECRET=embedded-disco-secret
+      - OP_CLIENT_REDIRECT_URI=https://localhost:8443/simplesaml/module.php/embeddeddisco/callback
+    volumes:
+      - ./op/ssp/authsources.php:/var/simplesamlphp/config/authsources.php:ro
+      - ./op/ssp/config-override.php:/var/simplesamlphp/config/config-override.php:ro
+      - ./op/ssp/module_oidc.php:/var/simplesamlphp/config/module_oidc.php:ro
+      - ./op/run-on-start.sh:/opt/simplesaml/run-on-start.sh:ro
+      - ./op/register-client.php:/opt/simplesaml/register-client.php:ro
+      - ./op/enroll-subordinate.php:/opt/simplesaml/enroll-subordinate.php:ro
+      - ./op/tls/op.crt:/etc/ssl/certs/op-demo.pem:ro
+      - ./op/tls/op.key:/etc/ssl/private/op-demo.key:ro
+    healthcheck:
+      test: ["CMD", "curl", "-kf", "https://localhost/simplesaml/module.php/oidc/.well-known/openid-federation"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s

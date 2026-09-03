@@ -374,12 +374,12 @@ docker compose -f docker/docker-compose.yml up --build -d
 Rebuild only when `composer.json` changes; otherwise `up -d` is enough. Follow
 logs with `docker compose -f docker/docker-compose.yml logs -f ssp`.
 
-### The local OpenID Provider
+### The local OpenID Providers
 
-`docker compose` brings up two services: `ssp`, the relying party with this
-module, and `op`, a SimpleSAMLphp with `simplesamlphp-module-oidc` — the same
-stack GÉANT's demo provider runs, so it speaks OpenID Federation and publishes
-its own Entity Configuration.
+`docker compose` brings up three services: `ssp`, the relying party with this
+module, and two SimpleSAMLphp providers, `op` and `op2`, running
+`simplesamlphp-module-oidc` — the same stack GÉANT's demo provider runs. Both
+publish their own Entity Configuration.
 
 Generate its certificate once before the first start:
 
@@ -395,21 +395,26 @@ provider's metadata from, so both sides need one URL that means the same thing.
 The relying party trusts that certificate through `http_ca_bundle`, which adds a
 CA rather than turning verification off.
 
-On start the OP generates its signing keys, runs its database migrations against
-SQLite, and registers this relying party as a client — see
-`docker/op/run-on-start.sh`, which the image runs before Apache.
+On start each OP generates independent signing keys, runs its database
+migrations against SQLite, and registers this relying party as a client. OP1
+also enrolls OP2's federation keys, so its federation list and fetch endpoints
+form a valid Trust Chain from OP2 to OP1. See `docker/op/run-on-start.sh`, which
+the image runs before Apache, and `docker/op/enroll-subordinate.php`.
 
 | What | Where |
 | --- | --- |
-| Provider issuer | `https://host.docker.internal:8444/simplesaml/module.php/oidc` |
-| Its Entity Configuration | `…/module.php/oidc/.well-known/openid-federation` |
-| Provider admin | <https://host.docker.internal:8444/simplesaml/> — `admin` / `secret1` |
+| OP1 issuer / Trust Anchor | `https://host.docker.internal:8444/simplesaml/module.php/oidc` |
+| OP2 issuer | `https://host.docker.internal:8445/simplesaml/module.php/oidc` |
+| Entity Configurations | Append `/.well-known/openid-federation` to either issuer |
+| OP1 admin | <https://host.docker.internal:8444/simplesaml/> — `admin` / `secret1` |
+| OP2 admin | <https://host.docker.internal:8445/simplesaml/> — `admin` / `secret1` |
 | Test users | `student` / `studentpass`, `staff` / `staffpass` |
 
-By default `trust_anchor_id` points at this provider, which acts as its own Trust
-Anchor — a one-entity federation, degenerate but legitimate, and the one where a
-login can be completed end to end. Point it at `https://ta.hier.fed.oidfed.com`
-instead to show discovery across a real multi-level federation.
+By default `trust_anchor_id` points at OP1. Discovery returns OP1 itself and OP2,
+which OP1 enrolls as its subordinate. This keeps the default setup fully local
+while exercising both direct Trust Anchor selection and a two-entity Trust
+Chain. Point it at `https://ta.hier.fed.oidfed.com` instead to show discovery
+across a real multi-level federation.
 
 ### Trying the login
 
@@ -441,7 +446,8 @@ which federation endpoints it advertises.
 * `docker/run.sh`, `docker/run.ps1` — option A wrappers (no build).
 * `docker/Dockerfile` — SSP base image plus this module, installed via a composer
   path repository at `/var/simplesamlphp/staging-modules/embeddeddisco`.
-* `docker/docker-compose.yml` — single `ssp` service, host port `8443` → 443.
+* `docker/docker-compose.yml` — the `ssp`, `op`, and `op2` services on host
+  ports `8443`, `8444`, and `8445`.
 * `docker/ssp/config-override.php` — appended to the container's SSP config.
 * `docker/ssp/authsources.php` — example auth sources for testing.
 * `config-templates/module_embeddeddisco.php` — module configuration, mounted

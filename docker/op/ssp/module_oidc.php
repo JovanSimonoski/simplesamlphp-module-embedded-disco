@@ -15,6 +15,10 @@ declare(strict_types=1);
  */
 use SimpleSAML\Module\oidc\ModuleConfig;
 
+$issuer = getenv('OP_ISSUER') ?: 'https://host.docker.internal:8444/simplesaml/module.php/oidc';
+$authorityHint = getenv('OP_AUTHORITY_HINT') ?: '';
+$displayName = getenv('OP_DISPLAY_NAME') ?: 'Local OpenID Provider';
+
 /*
  * Note: In v5 of this module, all config keys have been moved to constants for easier handling and verification.
  * However, all the key values have been preserved from previous module versions.
@@ -27,7 +31,7 @@ $config = [
      * is a case-sensitive URL using the https scheme that contains scheme, host, and optionally, port number and
      * path components and no query or fragment components."
      */
-    ModuleConfig::OPTION_ISSUER => 'https://host.docker.internal:8444/simplesaml/module.php/oidc',
+    ModuleConfig::OPTION_ISSUER => $issuer,
 
     /**
      * PKI (public / private key) settings related to OIDC protocol. These keys will be used, for example, to
@@ -365,7 +369,7 @@ $config = [
     // Federation authority hints. An array of strings representing the Entity Identifiers of Intermediate Entities
     // (or Trust Anchors). Required if this entity has a Superior entity above it.
     ModuleConfig::OPTION_FEDERATION_AUTHORITY_HINTS => [
-//        'https://intermediate.example.org/',
+        ...($authorityHint === '' ? [] : [$authorityHint]),
     ],
 
     // (optional) Federation Trust Mark tokens. An array of tokens (signed JWTs), each representing a Trust Mark
@@ -478,7 +482,7 @@ $config = [
     // Common federation entity parameters:
     // https://openid.net/specs/openid-federation-1_0.html#name-common-metadata-parameters
     ModuleConfig::OPTION_ORGANIZATION_NAME => null,
-    ModuleConfig::OPTION_DISPLAY_NAME => null,
+    ModuleConfig::OPTION_DISPLAY_NAME => $displayName,
     ModuleConfig::OPTION_DESCRIPTION => null,
     ModuleConfig::OPTION_KEYWORDS => [
         // 'some-keyword',
