@@ -18,6 +18,11 @@ $config['language.i18n.backend'] = 'gettext/gettext';
 $config['logging.level'] = 7;
 $config['usenewui'] = false;
 
+// Treat the SimpleSAMLphp front page as the demo RP entry point. This starts
+// the embedded-discovery auth source directly, without going through the
+// administrator-only authentication-source tester.
+$config['frontpage.redirect'] = '/simplesaml/module.php/embeddeddisco/login';
+
 // Trust the proxy/port mapping in front of the container so generated URLs keep
 // the published port.
 $config['trusted.url.domains'] = ['localhost'];

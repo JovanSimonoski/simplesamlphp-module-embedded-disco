@@ -7,6 +7,20 @@ embeddeddisco-discovery:
   }
   methods: [GET]
 
+embeddeddisco-login:
+  path: /login
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\Login::main'
+  }
+  methods: [GET]
+
+embeddeddisco-session:
+  path: /session
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\Login::session'
+  }
+  methods: [GET]
+
 embeddeddisco-entities:
   path: /entities
   defaults: {

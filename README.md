@@ -418,11 +418,13 @@ across a real multi-level federation.
 
 ### Trying the login
 
-<https://localhost:8443/simplesaml/module.php/admin/test/embedded-disco>
+<https://localhost:8443/simplesaml/>
 
-Log in as the SSP administrator, and the whole flow runs: the picker appears,
-Select verifies the Trust Chain and redirects to the provider, you authenticate
-there as `student`, and SimpleSAMLphp shows the claims that came back.
+The demo RP front page starts the `embedded-disco` authentication source
+directly, without an administrator login. The picker appears, Select verifies
+the Trust Chain and redirects to the provider, and you authenticate there as
+`student`. After the provider redirects back, the RP displays the resulting
+session attributes and technical authentication data.
 
 ### Either way
 

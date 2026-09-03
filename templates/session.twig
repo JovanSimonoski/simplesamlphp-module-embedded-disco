@@ -1,0 +1,60 @@
+{% set pagetitle = 'Authenticated session'|trans %}
+{% extends "base.twig" %}
+
+{% block preload %}
+  <link rel="stylesheet" href="{{ asset('css/discovery.css', 'embeddeddisco') }}">
+{% endblock %}
+
+{% block content %}
+<div class="eds">
+  <div class="eds-head">
+    <h2>{{ pagetitle }}</h2>
+    <p class="eds-lede">
+      {% trans %}The OpenID Provider authenticated this browser. This is the information SimpleSAMLphp stored for the relying-party session.{% endtrans %}
+    </p>
+  </div>
+
+  <div class="eds-note eds-note-success">
+    <p>{% trans %}Authentication completed successfully.{% endtrans %}</p>
+  </div>
+
+  <dl class="eds-meta">
+    {% if issuer %}
+      <div>
+        <dt>{% trans %}Provider{% endtrans %}</dt>
+        <dd><code title="{{ issuer }}">{{ issuer }}</code></dd>
+      </div>
+    {% endif %}
+    {% if expiresAt %}
+      <div>
+        <dt>{% trans %}Session expires{% endtrans %}</dt>
+        <dd>{{ expiresAt|date('Y-m-d H:i:s') }}</dd>
+      </div>
+    {% endif %}
+    {% if remaining is not null %}
+      <div>
+        <dt>{% trans %}Remaining{% endtrans %}</dt>
+        <dd>{{ remaining }} {% trans %}seconds{% endtrans %}</dd>
+      </div>
+    {% endif %}
+  </dl>
+
+  <h3>{% trans %}Session attributes{% endtrans %}</h3>
+  {% set items = attributes %}
+  {% embed '_table.twig' %}
+    {% block namecol %}
+      <td class="attrname"><samp>{{ name }}</samp></td>
+    {% endblock %}
+    {% block value %}{{ value }}{% endblock %}
+  {% endembed %}
+
+  {% if authData %}
+    <h3>{% trans %}Technical authentication data{% endtrans %}</h3>
+    <pre class="eds-metadata">{{ authData|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) }}</pre>
+  {% endif %}
+
+  <p>
+    <a class="eds-btn" href="{{ logoutUrl }}">{% trans %}Log out{% endtrans %}</a>
+  </p>
+</div>
+{% endblock %}

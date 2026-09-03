@@ -112,6 +112,12 @@
   background: var(--eds-amber-soft);
   color: var(--eds-amber);
 }
+.eds-note-success {
+  border-color: var(--eds-success-line);
+  border-left-color: var(--eds-success);
+  background: var(--eds-success-soft);
+  color: var(--eds-success);
+}
 .eds-note-danger {
   border-color: var(--eds-danger-line);
   border-left-color: var(--eds-danger);
@@ -450,6 +456,20 @@
 .eds-foot code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: .74rem;
+  overflow-wrap: anywhere;
+}
+
+.eds-metadata {
+  max-height: 24rem;
+  overflow: auto;
+  border: 1px solid var(--eds-line);
+  border-radius: var(--eds-radius);
+  background: var(--eds-soft);
+  padding: .8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .75rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
