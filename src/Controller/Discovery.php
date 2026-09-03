@@ -86,13 +86,34 @@ class Discovery
     /**
      * The picker itself.
      */
-    public function main(Request $request): Template
+    public function main(Request $request): Response
     {
         $discoveryQuery = DiscoveryQuery::fromRequest($request, $this->moduleConfig);
         $isAdmin = $this->authUtils->isAdmin();
         $result = $this->discoveryService->discover($discoveryQuery, $this->wantsRefresh($request) && $isAdmin);
 
         $returnTo = $this->returnTo($request);
+        $authState = $this->authState($request);
+
+        // During a login there is no choice to present when discovery found
+        // exactly one provider. Run the same verified selection path that the
+        // provider's Select link would have invoked.
+        if (
+            $authState !== null
+            && $discoveryQuery->from === null
+            && count($result->entities) === 1
+            && $result->nextPageToken === null
+            && ($result->total === null || $result->total === 1)
+        ) {
+            $entityId = $result->entities[0]['entityId'] ?? null;
+
+            if (is_string($entityId) && $entityId !== '') {
+                return $this->select($request->duplicate(query: [
+                    ...$request->query->all(),
+                    'entity_id' => $entityId,
+                ]));
+            }
+        }
 
         $template = new Template($this->config, 'embeddeddisco:discovery.twig');
 
@@ -107,7 +128,7 @@ class Discovery
         $template->data['usingMockData'] = $this->moduleConfig->useMockData();
         // Present when the picker is a step inside a login, and every link out
         // of the page has to carry it or the login is lost.
-        $template->data['authState'] = $this->authState($request);
+        $template->data['authState'] = $authState;
         $template->data['discoverySource'] = $result->source->value;
         $template->data['discoveryFailed'] = $result->hasFailed();
         $template->data['discoveryError'] = $this->moduleConfig->exposeErrorDetails() ? $result->error : null;
@@ -115,7 +136,6 @@ class Discovery
         $template->data['formUrl'] = Module::getModuleURL(self::ROUTE_DISCOVERY);
         $template->data['selectUrl'] = Module::getModuleURL(self::ROUTE_SELECT);
         $template->data['entitiesUrl'] = Module::getModuleURL(self::ROUTE_ENTITIES);
-        $authState = $this->authState($request);
         $template->data['nextPageUrl'] = $result->nextPageToken === null
             ? null
             : $this->discoveryUrl($discoveryQuery, $result->nextPageToken, $returnTo, false, $authState);
