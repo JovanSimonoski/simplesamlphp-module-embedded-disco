@@ -157,7 +157,6 @@ class DiscoveryServiceTest extends TestCase
 
         $response = $service->toCollectionEndpointResponse($result->collection);
 
-        $this->assertArrayHasKey('entities', $response);
         $this->assertCount(2, $response['entities']);
         $this->assertArrayHasKey('entity_id', $response['entities'][0]);
         $this->assertArrayHasKey('entity_types', $response['entities'][0]);

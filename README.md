@@ -42,6 +42,9 @@ the SimpleSAMLphp session.
 | `module.php/embeddeddisco/select` | Trust Chain verification, then the hand-off to the provider |
 | `module.php/embeddeddisco/callback` | Where the provider returns the user; token exchange and ID token validation |
 | `module.php/embeddeddisco/status` | Wiring smoke test, including whether the Trust Anchor is reachable |
+| `module.php/embeddeddisco/federation/.well-known/openid-federation` | This RP or local authority's signed Entity Configuration |
+| `module.php/embeddeddisco/federation/list` | Local Trust Anchor subordinate listing |
+| `module.php/embeddeddisco/federation/fetch?sub=…` | Local Trust Anchor Subordinate Statement issuance |
 
 Configured as an authentication source, so anything on this installation can use
 federated discovery without knowing about it:
@@ -73,36 +76,19 @@ start a login, `https://op-uni.hier.fed.oidfed.com` answers:
 
 It is not a bug in the module; we are simply not a member of that federation.
 
-## The federation it points at
+## Trust Anchor selection
 
-The default Trust Anchor is the GÉANT Trust and Identity Incubator's OpenID
-Federation testbed:
+The Docker configuration uses the dedicated local Trust Anchor on port `8446`.
+Outside Docker, the module's code-level fallback is the GÉANT Trust and Identity
+Incubator testbed at `https://oidfed-ta-demo.incubator.geant.org`, but production
+deployments should always set `trust_anchor_id` explicitly.
 
-| | |
-| --- | --- |
-| Trust Anchor (entity ID) | <https://oidfed-ta-demo.incubator.geant.org> |
-| Its Entity Configuration | <https://oidfed-ta-demo.incubator.geant.org/.well-known/openid-federation> |
-| Subordinates | `https://oidfed-appdemo.incubator.geant.org` (RP), `https://oidfed-op-demo.incubator.geant.org` (OP), `https://idp.mivanci.incubator.hexaa.eu` (OP) |
-
-The second URL is not a separate service: appending
-`/.well-known/openid-federation` to an entity ID is how OpenID Federation
-publishes an entity's self-signed Entity Configuration, and for a Trust Anchor
-that document is where its `federation_list_endpoint` (its subordinates) and
-`federation_fetch_endpoint` (Subordinate Statements about them) are advertised.
-That single document is the entry point for everything this module does.
-
-The Incubator also hosts a static
-[Home Organisation Picker demo](https://oidfed-ta-demo.incubator.geant.org/hop/)
-with the same two OPs hard-coded into an HTML table. This module is the
-dynamic equivalent: the same list, discovered from the federation.
-
-**The Trust Anchor's federation endpoints answered `503 Service Unavailable`
-throughout development** (its own subordinates were up and still name it as their
-`authority_hints`, so this looks like the Trust Anchor service being down rather
-than the demo being retired). Live behaviour was therefore verified against the
-[fed.oidfed.com](https://fed.oidfed.com/) demo topologies, which expose the same
-interfaces — see [Verifying against another federation](#verifying-against-another-federation).
-Nothing in the module is specific to either; the Trust Anchor is one config line.
+Appending `/.well-known/openid-federation` to an entity ID obtains that entity's
+self-signed Entity Configuration. For an authority, its federation metadata
+advertises the list and fetch endpoints used to discover subordinates and build
+Trust Chains. Nothing in the discovery code is tied to the local anchor; changing
+the configured anchor is enough to inspect another compatible federation. Login
+still requires the RP and OP to share a Trust Anchor accepted by both parties.
 
 ## Configuration
 
@@ -446,9 +432,9 @@ The local certificate is self-signed, so expect a browser warning.
 | --- | --- |
 | **Embedded discovery** | <https://localhost:8443/simplesaml/module.php/embeddeddisco/disco> |
 | Entity collection JSON | <https://localhost:8443/simplesaml/module.php/embeddeddisco/entities> |
-| SSP admin UI | <https://localhost:8443/simplesaml/> — user `admin`, password `secret1` |
+| RP login | <https://localhost:8443/simplesaml/> |
+| SSP admin UI | <https://localhost:8443/simplesaml/module.php/admin/> — user `admin`, password `secret1` |
 | Module smoke test | <https://localhost:8443/simplesaml/module.php/embeddeddisco/status> |
-| Test auth source | `example-userpass`, e.g. `student` / `studentpass` |
 
 `status` is the first thing to check when the picker comes up empty. It reports
 whether the Trust Anchor answered, when its Entity Configuration expires, and
@@ -484,9 +470,7 @@ collection endpoint, timeouts never reaching zero).
 
 ### Verifying against another federation
 
-Live behaviour cannot be asserted in a unit test, and the default Trust Anchor
-was down throughout development. To check the module against a federation that is
-up, point `trust_anchor_id` at one of the
+To inspect a public federation, point `trust_anchor_id` at one of the
 [fed.oidfed.com](https://fed.oidfed.com/) topologies:
 
 | Trust Anchor | Shape |
@@ -499,7 +483,23 @@ Against `ta.hier`, discovery finds 7 entities (2 of them OPs), and selecting
 `https://op-uni.hier.fed.oidfed.com` resolves the chain
 `op-uni → ia-edu → ta.hier` with policy-resolved `openid_provider` metadata.
 
-## Not done yet
+## Known limitations and next work
+
+The Compose topology is a working interoperability environment, not a production
+federation operator deployment. In particular:
+
+* The dedicated Trust Anchor implements the Entity Configuration, subordinate
+  listing, and fetch endpoints needed by this topology. It does not yet implement
+  optional list filters, a resolve endpoint, or a collection endpoint.
+* Federation and protocol keys persist, but there is no rollover or historical
+  key endpoint yet.
+* All four HTTPS services reuse one self-signed development certificate. Their
+  federation and OIDC signing keys are separate; production TLS certificates
+  should also be separate and issued by a proper local or public CA.
+* The OP image is pinned to `simplesamlphp-module-oidc` 6.4.5, whose documented
+  federation support targets the implementation available in that release.
+  Recheck interoperability before upgrading it or targeting a stricter profile
+  of the final OpenID Federation 1.0 specification.
 
 * **Trust Mark validation against real marks.** The code path is there and runs,
   but no entity in any reachable demo federation publishes a `trust_marks` claim,

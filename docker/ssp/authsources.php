@@ -9,10 +9,10 @@ $config = array(
         'core:AdminPassword',
     ),
 
-    // Log in through a provider discovered in the federation. Visiting the admin
-    // area's "Test authentication sources" page and picking this one runs the
-    // whole flow: the picker, Trust Chain verification, the provider's own login
-    // page, and back here with the claims it issued.
+    // Log in through a provider discovered in the federation. The RP front page
+    // starts this source directly and runs the whole flow: the picker, Trust
+    // Chain verification, the provider's own login page, and back to the RP with
+    // the claims it issued.
     'embedded-disco' => [
         'embeddeddisco:OpenIdFederation',
     ],

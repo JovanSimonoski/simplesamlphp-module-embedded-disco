@@ -193,4 +193,16 @@ class ModuleConfigTest extends TestCase
         $this->assertFalse($moduleConfig->isFederationRelyingParty());
         $this->assertFalse($moduleConfig->isFederationTrustAnchor());
     }
+
+
+    public function testAnEmptyFederationEntityIdCannotEnableARole(): void
+    {
+        $moduleConfig = $this->moduleConfig([
+            ModuleConfig::OPTION_FEDERATION_ENTITY_ID => '///',
+            ModuleConfig::OPTION_FEDERATION_ENTITY_ROLE => ModuleConfig::FEDERATION_ROLE_RELYING_PARTY,
+        ]);
+
+        $this->assertNull($moduleConfig->getFederationEntityId());
+        $this->assertFalse($moduleConfig->isFederationRelyingParty());
+    }
 }

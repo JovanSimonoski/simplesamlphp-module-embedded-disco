@@ -374,7 +374,13 @@ class ModuleConfig
     {
         $entityId = $this->config->getOptionalString(self::OPTION_FEDERATION_ENTITY_ID, null);
 
-        return ($entityId === null || $entityId === '') ? null : rtrim($entityId, '/');
+        if ($entityId === null) {
+            return null;
+        }
+
+        $entityId = rtrim($entityId, '/');
+
+        return $entityId === '' ? null : $entityId;
     }
 
 
