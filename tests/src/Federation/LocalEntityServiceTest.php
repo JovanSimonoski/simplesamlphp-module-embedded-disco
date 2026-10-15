@@ -6,6 +6,7 @@ namespace SimpleSAML\Test\Module\embeddeddisco\Federation;
 
 use OpenSSLAsymmetricKey;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use SimpleSAML\Configuration;
@@ -44,7 +45,14 @@ class LocalEntityServiceTest extends TestCase
     }
 
 
-    public function testRelyingPartyPublishesVerifiableMetadataAndSignsRequestObjects(): void
+    public static function initiationUris(): array
+    {
+        return [[null], ['https://rp.example.org/initiate-login']];
+    }
+
+
+    #[DataProvider('initiationUris')]
+    public function testRelyingPartyPublishesVerifiableMetadataAndSignsRequestObjects(?string $initiateUri): void
     {
         $entityId = 'https://rp.example.org/federation';
         $authorityId = 'https://ta.example.org/federation';
@@ -56,6 +64,7 @@ class LocalEntityServiceTest extends TestCase
             ModuleConfig::OPTION_FEDERATION_PRIVATE_KEY => $this->federationKeyPath,
             ModuleConfig::OPTION_PROTOCOL_PRIVATE_KEY => $this->protocolKeyPath,
             ModuleConfig::OPTION_FEDERATION_REDIRECT_URIS => [$redirectUri],
+            ModuleConfig::OPTION_INITIATE_LOGIN_URI => $initiateUri,
             ModuleConfig::OPTION_FEDERATION_DISPLAY_NAME => 'Test RP',
             ModuleConfig::OPTION_SCOPES => ['openid'],
             ModuleConfig::OPTION_CACHE_DIRECTORY => sys_get_temp_dir() . '/embeddeddisco-local-entity-test',
@@ -77,6 +86,11 @@ class LocalEntityServiceTest extends TestCase
         $this->assertSame([$redirectUri], $rpMetadata[ClaimsEnum::RedirectUris->value]);
         $this->assertSame('none', $rpMetadata[ClaimsEnum::TokenEndpointAuthMethod->value]);
         $this->assertSame(['automatic'], $rpMetadata[ClaimsEnum::ClientRegistrationTypes->value]);
+        if ($initiateUri === null) {
+            $this->assertArrayNotHasKey('initiate_login_uri', $rpMetadata);
+        } else {
+            $this->assertSame($initiateUri, $rpMetadata['initiate_login_uri']);
+        }
 
         $protocolJwks = $rpMetadata[ClaimsEnum::Jwks->value] ?? null;
         $this->assertIsArray($protocolJwks);

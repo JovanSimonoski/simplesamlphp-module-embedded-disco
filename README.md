@@ -28,6 +28,12 @@ even though the repository is not.
 
 ## Status
 
+Optional **Home Organization Picker (HOP)** mode separates discovery from the
+RP: the picker returns the selected OP through the RP's `initiate_login_uri`.
+Both RP-initiated and picker-first login are supported. See the
+[HOP setup and local demo](docs/hop.md). The existing embedded flow remains the
+default when `hop_endpoint` is unset.
+
 The picker runs against a **live federation** and **logs people in**. It fetches
 the Trust Anchor's Entity Configuration, walks the federation, and renders what
 it finds. Picking a provider resolves a Trust Chain for it, and — inside a login
@@ -38,6 +44,9 @@ the SimpleSAMLphp session.
 | Endpoint | Purpose |
 | --- | --- |
 | `module.php/embeddeddisco/disco` | The embedded picker (search, sort, paginate) |
+| `module.php/embeddeddisco/hop` | HOP picker for enrolled RPs; returns the selected OP as `iss` |
+| `module.php/embeddeddisco/initiate-login` | GET/POST third-party login initiation at the RP |
+| `module.php/embeddeddisco/hop/resume` | Completes the original SSP request after an RP-initiated HOP login |
 | `module.php/embeddeddisco/entities` | Same result set as an OpenID Federation entity collection response |
 | `module.php/embeddeddisco/select` | Trust Chain verification, then the hand-off to the provider |
 | `module.php/embeddeddisco/callback` | Where the provider returns the user; token exchange and ID token validation |

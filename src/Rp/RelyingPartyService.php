@@ -80,6 +80,7 @@ class RelyingPartyService
      */
     public function prepareAuthorizationRequest(
         SelectionVerification $selectionVerification,
+        ?string $loginHint = null,
     ): AuthorizationRequest {
         if (!$selectionVerification->verified) {
             // Refusing here as well as in the UI: an unverified provider is one
@@ -116,6 +117,7 @@ class RelyingPartyService
             scopes: $scopes,
             nonce: $this->randomString(),
             codeVerifier: $this->randomString(),
+            loginHint: $loginHint,
         );
     }
 
@@ -136,6 +138,10 @@ class RelyingPartyService
             'code_challenge' => $this->urlSafe(hash('sha256', $authorizationRequest->codeVerifier, true)),
             'code_challenge_method' => 'S256',
         ];
+
+        if ($authorizationRequest->loginHint !== null) {
+            $parameters['login_hint'] = $authorizationRequest->loginHint;
+        }
 
         if ($this->isFederationClient($authorizationRequest->clientId)) {
             try {

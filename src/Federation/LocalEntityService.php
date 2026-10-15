@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SimpleSAML\Module\embeddeddisco\Federation;
 
 use RuntimeException;
+use SimpleSAML\Module\embeddeddisco\Hop\Protocol;
 use SimpleSAML\Module\embeddeddisco\ModuleConfig;
 use SimpleSAML\OpenID\Algorithms\SignatureAlgorithmEnum;
 use SimpleSAML\OpenID\Codebooks\ApplicationTypesEnum;
@@ -174,6 +175,9 @@ class LocalEntityService
                     ClaimsEnum::TokenEndpointAuthMethod->value => TokenEndpointAuthMethodsEnum::None->value,
                     ClaimsEnum::Jwks->value => $this->publicJwks($this->protocolKey()),
                     ClaimsEnum::ClientRegistrationTypes->value => ['automatic'],
+                    ...($this->moduleConfig->getInitiateLoginUri() === null ? [] : [
+                        'initiate_login_uri' => Protocol::httpsUrl($this->moduleConfig->getInitiateLoginUri()),
+                    ]),
                 ],
             ];
         }

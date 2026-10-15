@@ -32,6 +32,9 @@ class ModuleConfigTest extends TestCase
         $this->assertSame([EntityTypesEnum::OpenIdProvider->value], $moduleConfig->getEntityTypes());
         $this->assertTrue($moduleConfig->verifySelection());
         $this->assertTrue($moduleConfig->validateTrustMarks());
+        $this->assertNull($moduleConfig->getHopEndpoint());
+        $this->assertNull($moduleConfig->getInitiateLoginUri());
+        $this->assertSame([], $moduleConfig->getHopTrustedRps());
     }
 
 

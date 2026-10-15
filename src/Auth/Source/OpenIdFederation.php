@@ -6,6 +6,10 @@ namespace SimpleSAML\Module\embeddeddisco\Auth\Source;
 
 use SimpleSAML\Auth;
 use SimpleSAML\Module;
+use SimpleSAML\Module\embeddeddisco\Hop\Continuation;
+use SimpleSAML\Module\embeddeddisco\Hop\Protocol;
+use SimpleSAML\Module\embeddeddisco\Hop\RelyingParty;
+use SimpleSAML\Module\embeddeddisco\ModuleConfig;
 use SimpleSAML\Utils;
 
 /**
@@ -20,9 +24,9 @@ use SimpleSAML\Utils;
  *         'embeddeddisco:OpenIdFederation',
  *     ],
  *
- * The source itself does very little. It hands the user to the picker and waits;
- * the picker verifies what they choose, redirects to that provider, and the
- * callback route completes the login through completeAuth().
+ * The source hands the user to embedded discovery or a configured HOP. The RP
+ * verifies the selected provider and the callback completes the login through
+ * completeAuth().
  */
 class OpenIdFederation extends Auth\Source
 {
@@ -46,6 +50,12 @@ class OpenIdFederation extends Auth\Source
      */
     public const string PENDING = 'embeddeddisco:Pending';
 
+    public const string SELECTED_ISSUER = 'embeddeddisco:SelectedIssuer';
+
+    public const string LOGIN_HINT = 'embeddeddisco:LoginHint';
+
+    public const string HOP_CONTINUATION = 'embeddeddisco:HopContinuation';
+
 
     /**
      * @param array<mixed> $info
@@ -65,9 +75,26 @@ class OpenIdFederation extends Auth\Source
         // The callback needs to find its way back to this source.
         $state[self::AUTH_ID] = $this->authId;
 
+        $moduleConfig = new ModuleConfig();
+        $httpUtils = new Utils\HTTP();
+        $issuer = $state[self::SELECTED_ISSUER] ?? null;
+        if (is_string($issuer) && $issuer !== '') {
+            Protocol::httpsUrl($issuer, false);
+            $stateId = Auth\State::saveState($state, self::STAGE_DISCOVERY);
+            $httpUtils->redirectTrustedURL(Module::getModuleURL('embeddeddisco/select', [
+                'entity_id' => $issuer,
+                'AuthState' => $stateId,
+            ]));
+            return;
+        }
+        if ($moduleConfig->getHopEndpoint() !== null) {
+            $target = (new Continuation())->start($state, Module::getModuleURL('embeddeddisco/hop/resume'));
+            $httpUtils->redirectTrustedURL((new RelyingParty($moduleConfig))->outgoingUrl($target));
+            return;
+        }
+
         $stateId = Auth\State::saveState($state, self::STAGE_DISCOVERY);
 
-        $httpUtils = new Utils\HTTP();
         $httpUtils->redirectTrustedURL(
             Module::getModuleURL('embeddeddisco/disco', ['AuthState' => $stateId]),
         );
@@ -82,6 +109,10 @@ class OpenIdFederation extends Auth\Source
      */
     public static function completeWithAttributes(array $state, array $attributes): void
     {
+        $continuation = $state[self::HOP_CONTINUATION] ?? null;
+        if (is_string($continuation)) {
+            (new Continuation())->complete($continuation, $attributes);
+        }
         $state['Attributes'] = $attributes;
 
         // Does not return: it resumes whatever was interrupted when the login

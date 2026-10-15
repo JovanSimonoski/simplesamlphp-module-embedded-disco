@@ -10,6 +10,7 @@ use SimpleSAML\Error\Exception as SspException;
 use SimpleSAML\Module;
 use SimpleSAML\Module\embeddeddisco\Auth\Source\OpenIdFederation;
 use SimpleSAML\Module\embeddeddisco\Federation\DiscoveryQuery;
+use SimpleSAML\Module\embeddeddisco\Federation\DiscoveryResult;
 use SimpleSAML\Module\embeddeddisco\Federation\DiscoveryService;
 use SimpleSAML\Module\embeddeddisco\Federation\FederationFactory;
 use SimpleSAML\Module\embeddeddisco\Federation\SelectionVerification;
@@ -92,7 +93,6 @@ class Discovery
         $isAdmin = $this->authUtils->isAdmin();
         $result = $this->discoveryService->discover($discoveryQuery, $this->wantsRefresh($request) && $isAdmin);
 
-        $returnTo = $this->returnTo($request);
         $authState = $this->authState($request);
 
         // During a login there is no choice to present when discovery found
@@ -115,6 +115,18 @@ class Discovery
             }
         }
 
+        return $this->discoveryTemplate($request, $discoveryQuery, $result, $isAdmin);
+    }
+
+
+    protected function discoveryTemplate(
+        Request $request,
+        DiscoveryQuery $discoveryQuery,
+        DiscoveryResult $result,
+        bool $isAdmin,
+    ): Template {
+        $returnTo = $this->returnTo($request);
+        $authState = $this->authState($request);
         $template = new Template($this->config, 'embeddeddisco:discovery.twig');
 
         $template->data['entities'] = $result->entities;
@@ -262,8 +274,16 @@ class Discovery
         // has expired cannot be resumed from a link.
         $state = Auth\State::loadState($authStateId, OpenIdFederation::STAGE_DISCOVERY);
 
+        if (isset($state[OpenIdFederation::SELECTED_ISSUER]) &&
+            $state[OpenIdFederation::SELECTED_ISSUER] !== $verification->entityId) {
+            throw new SspException('The selected provider does not match this login initiation.');
+        }
+
         try {
-            $authorizationRequest = $this->relyingPartyService->prepareAuthorizationRequest($verification);
+            $authorizationRequest = $this->relyingPartyService->prepareAuthorizationRequest(
+                $verification,
+                $state[OpenIdFederation::LOGIN_HINT] ?? null,
+            );
         } catch (RelyingPartyException $relyingPartyException) {
             // A verified provider we hold no client registration for. Say so on
             // the selection page rather than failing the whole login.

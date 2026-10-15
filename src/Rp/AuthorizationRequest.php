@@ -31,6 +31,7 @@ class AuthorizationRequest
         public readonly array $scopes,
         public readonly string $nonce,
         public readonly string $codeVerifier,
+        public readonly ?string $loginHint = null,
     ) {
     }
 

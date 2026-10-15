@@ -59,6 +59,20 @@ class ModuleConfig
 
     public const string OPTION_SCOPES = 'scopes';
 
+    public const string OPTION_HOP_ENDPOINT = 'hop_endpoint';
+
+    public const string OPTION_INITIATE_LOGIN_URI = 'initiate_login_uri';
+
+    public const string OPTION_HOP_TRUSTED_RPS = 'hop_trusted_rps';
+
+    public const string OPTION_HOP_ALLOWED_TARGET_ORIGINS = 'hop_allowed_target_origins';
+
+    public const string OPTION_HOP_DEFAULT_TARGET = 'hop_default_target';
+
+    public const string OPTION_HOP_HINT = 'hop_hint';
+
+    public const string OPTION_HOP_AUTO_SELECT = 'hop_auto_select';
+
     public const string OPTION_FEDERATION_ENTITY_ID = 'federation_entity_id';
 
     public const string OPTION_FEDERATION_ENTITY_ROLE = 'federation_entity_role';
@@ -480,6 +494,60 @@ class ModuleConfig
         $result = $scopes === [] ? ['openid'] : $scopes;
 
         return $result;
+    }
+
+
+    public function getHopEndpoint(): ?string
+    {
+        return $this->nonEmptyString(self::OPTION_HOP_ENDPOINT);
+    }
+
+
+    public function getInitiateLoginUri(): ?string
+    {
+        return $this->nonEmptyString(self::OPTION_INITIATE_LOGIN_URI);
+    }
+
+
+    /**
+     * Exact RP entity IDs mapped to their approved login-initiation URLs.
+     *
+     * @return array<string, string>
+     */
+    public function getHopTrustedRps(): array
+    {
+        $result = [];
+        foreach ($this->config->getOptionalArray(self::OPTION_HOP_TRUSTED_RPS, []) as $id => $uri) {
+            if (is_string($id) && $id !== '' && is_string($uri) && $uri !== '') {
+                $result[$id] = $uri;
+            }
+        }
+        return $result;
+    }
+
+
+    /** @return string[] */
+    public function getHopAllowedTargetOrigins(): array
+    {
+        return $this->stringList(self::OPTION_HOP_ALLOWED_TARGET_ORIGINS);
+    }
+
+
+    public function getHopDefaultTarget(): ?string
+    {
+        return $this->nonEmptyString(self::OPTION_HOP_DEFAULT_TARGET);
+    }
+
+
+    public function getHopHint(): ?string
+    {
+        return $this->nonEmptyString(self::OPTION_HOP_HINT);
+    }
+
+
+    public function hopAutoSelect(): bool
+    {
+        return $this->config->getOptionalBoolean(self::OPTION_HOP_AUTO_SELECT, true);
     }
 
 

@@ -143,6 +143,26 @@ $config = [
     // Scopes to ask for, unless a client entry above overrides them.
     ModuleConfig::OPTION_SCOPES => ['openid'],
 
+    // Optional HOP mode. Without hop_endpoint the existing embedded flow is
+    // unchanged. The Docker HOP override enables a separate picker on :8447.
+    ModuleConfig::OPTION_HOP_ENDPOINT => getenv('EMBEDDED_DISCO_HOP') === '1'
+        ? 'https://localhost:8447/simplesaml/module.php/embeddeddisco/hop' : null,
+    ModuleConfig::OPTION_INITIATE_LOGIN_URI => getenv('EMBEDDED_DISCO_HOP') === '1'
+        ? 'https://localhost:8443/simplesaml/module.php/embeddeddisco/initiate-login' : null,
+    ModuleConfig::OPTION_HOP_DEFAULT_TARGET =>
+        'https://localhost:8443/simplesaml/module.php/embeddeddisco/session',
+    // Picker enrollment: exact RP IDs => approved initiation URLs. The picker
+    // fetches only enrolled IDs and checks their published metadata matches.
+    ModuleConfig::OPTION_HOP_TRUSTED_RPS => [
+        'https://host.docker.internal:8443/simplesaml/module.php/embeddeddisco/federation' =>
+            'https://localhost:8443/simplesaml/module.php/embeddeddisco/initiate-login',
+    ],
+    // The RP's own initiation origin is always allowed. Extra target origins
+    // must be explicitly listed here; no wildcard domains are supported.
+    ModuleConfig::OPTION_HOP_ALLOWED_TARGET_ORIGINS => [],
+    ModuleConfig::OPTION_HOP_HINT => null,
+    ModuleConfig::OPTION_HOP_AUTO_SELECT => true,
+
     // A CA bundle to verify federation and provider endpoints against, for a
     // private federation whose certificates the system trust store does not
     // know. This adds a trusted CA; it never disables verification. Null uses

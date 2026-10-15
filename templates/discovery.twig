@@ -106,6 +106,9 @@
   </dl>
 
   <form method="get" action="{{ formUrl }}" class="eds-toolbar">
+    {% for name, value in contextParameters|default([]) %}
+      <input type="hidden" name="{{ name }}" value="{{ value }}">
+    {% endfor %}
     {% if returnTo %}<input type="hidden" name="ReturnTo" value="{{ returnTo }}">{% endif %}
     {# Searching must not drop the login this page is a step in. #}
     {% if authState %}<input type="hidden" name="AuthState" value="{{ authState }}">{% endif %}
@@ -201,10 +204,10 @@
 
           <div class="eds-actions">
             <a class="eds-btn eds-btn-primary"
-               href="{{ selectUrl }}?entity_id={{ entity.entityId|url_encode }}
+               href="{% if entity.selectUrl is defined %}{{ entity.selectUrl }}{% else %}{{ selectUrl }}?entity_id={{ entity.entityId|url_encode }}
                      {%- if returnTo %}&amp;ReturnTo={{ returnTo|url_encode }}{% endif %}
-                     {%- if authState %}&amp;AuthState={{ authState|url_encode }}{% endif %}">
-              {% trans %}Select{% endtrans %}
+                     {%- if authState %}&amp;AuthState={{ authState|url_encode }}{% endif %}{% endif %}">
+              {% if entity.suggested|default(false) %}{% trans %}Continue with suggested provider{% endtrans %}{% else %}{% trans %}Select{% endtrans %}{% endif %}
             </a>
             {% if entity.informationUri %}
               <a class="eds-info" href="{{ entity.informationUri }}"

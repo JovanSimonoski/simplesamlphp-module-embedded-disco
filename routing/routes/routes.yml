@@ -1,5 +1,26 @@
 ---
 
+embeddeddisco-hop:
+  path: /hop
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\Hop::main'
+  }
+  methods: [GET]
+
+embeddeddisco-initiate-login:
+  path: /initiate-login
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\HopLogin::initiate'
+  }
+  methods: [GET, POST]
+
+embeddeddisco-hop-resume:
+  path: /hop/resume
+  defaults: {
+    _controller: 'SimpleSAML\Module\embeddeddisco\Controller\HopLogin::resume'
+  }
+  methods: [GET]
+
 embeddeddisco-discovery:
   path: /disco
   defaults: {
